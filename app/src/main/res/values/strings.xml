@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">QpDemoBlueSparrow</string>
+    <string name="title_activity_device">DeviceActivity</string>
+</resources>
