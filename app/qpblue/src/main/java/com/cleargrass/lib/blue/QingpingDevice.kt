@@ -194,7 +194,11 @@ internal class ResponseCollector() {
             throw IllegalStateException("ResponseCollector nextResponder == null")
         }
         isCollecting = true;
-        Protocol.from(command, true)?.let { protocol ->
+        /**
+         * 目前只有 0x07 和 0x04 命令 是多页的。都是获取wifi列表命令，0x04已废弃。
+         */
+        val reponseHasMultiPage = waitingType == 0x7.toByte() || waitingType == 0x4.toByte()
+        Protocol.from(command, reponseHasMultiPage)?.let { protocol ->
             if (protocol.type == waitingType) {
                 respMap[protocol.page] = protocol.data!!
             }
