@@ -22,14 +22,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -39,7 +43,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class,
+    ExperimentalLayoutApi::class
+)
 @Composable
 fun Inputer(
     enabled: Boolean = true,
@@ -50,7 +56,7 @@ fun Inputer(
     // 输入框
     var inputText by remember { mutableStateOf( TextFieldValue()) }
     var menuShow by remember { mutableStateOf(false) }
-    var keyShow by remember { mutableStateOf(false) }
+    var abcdefKeyShow by remember { mutableStateOf(false) }
     // 组合
     Column {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -97,7 +103,6 @@ fun Inputer(
                     .align(Alignment.CenterVertically)
                     .weight(1f)
                     .clickable {
-                        keyShow = !keyShow
                         menuShow = false
                     }
             ) {
@@ -148,7 +153,7 @@ fun Inputer(
                 }
             }
         }
-        if (enabled) {
+        if (enabled && WindowInsets.isImeVisible) {
             Row {
                 ABCDEF(modifier = Modifier.weight(1f), "A") {
                     inputText = inputText.insert("A")

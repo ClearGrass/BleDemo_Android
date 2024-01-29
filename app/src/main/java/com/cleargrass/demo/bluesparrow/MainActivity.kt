@@ -74,32 +74,37 @@ class MainActivity : ComponentActivity() {
                                     return@FloatingActionButton;
                                 }
                                 scanDevice.clear()
-                                BlueManager.initBleManager(this)
-                                BlueManager.scan(QingpingFilter.build(onlyPairing, false, if (selectedPrd > 0) byteArrayOf(
-                                    selectedPrd.toByte()
-                                ) else null, null), object :DeviceScanCallback() {
-                                    override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
-                                        Log.d("blue", "onDeviceInRange: $qingpingDevice")
-                                        scanDevice.add(ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData))
-                                    }
+                                if (BlueManager.initBleManager(this)) {
+                                    BlueManager.scan(QingpingFilter.build(onlyPairing, false, if (selectedPrd > 0) byteArrayOf(
+                                        selectedPrd.toByte()
+                                    ) else null, null), object :DeviceScanCallback() {
+                                        override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
+                                            Log.d("blue", "onDeviceInRange: $qingpingDevice")
+                                            scanDevice.add(ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData))
+                                        }
 
-                                    override fun onScanStart() {
-                                        Log.d("blue", "onScanStart")
-                                        isScanning = true;
-                                    }
+                                        override fun onScanStart() {
+                                            Log.d("blue", "onScanStart")
+                                            isScanning = true;
+                                        }
 
-                                    override fun onScanStop() {
-                                        Log.d("blue", "onScanStop")
-                                        isScanning = false;
-                                    }
+                                        override fun onScanStop() {
+                                            Log.d("blue", "onScanStop")
+                                            isScanning = false;
+                                        }
 
-                                    override fun onScanFailed(errorCode: Int) {
-                                        Log.d("blue", "onScanFailed $errorCode")
-                                        isScanning = false;
-                                        content = "Scan Failed $errorCode"
-                                    }
+                                        override fun onScanFailed(errorCode: Int) {
+                                            Log.d("blue", "onScanFailed $errorCode")
+                                            isScanning = false;
+                                            content = "Scan Failed:$errorCode"
+                                        }
 
-                                })
+                                    })
+                                } else {
+                                    Log.d("blue", "onScanFailed permission denied")
+                                    content = "Scan Failed: permission denied"
+                                }
+
                             })
                         { Icon(imageVector = if (isScanning) Icons.Default.Close else Icons.Default.Refresh, contentDescription = "Add") }
                     }
@@ -124,7 +129,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (!content.isEmpty()) {
+                    if (content.isNotEmpty()) {
                         AlertDialog(
                             text={
                                 Text(text = content)
@@ -152,10 +157,12 @@ class MainActivity : ComponentActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) !=
+                PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) !=
                 PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(
                     this,
-                    arrayOf(android.Manifest.permission.BLUETOOTH_SCAN),
+                    arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT),
                     1
                 )
 

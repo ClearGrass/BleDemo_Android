@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.Pair;
 
 import androidx.annotation.MainThread;
 
@@ -44,12 +45,14 @@ public class Peripheral extends BluetoothGattCallback {
     private Callback connectCallback;
     private OnConnectionStatusCallback connectStatusCallback;
     private Callback retrieveServicesCallback;
-    private ValueCallback<byte[]> readCallback;
-    private ValueCallback<byte[]> notifyCallback;
+    private ValueCallback<UuidAndBytes> readCallback;
+    private ValueCallback<UuidAndBytes> notifyCallback;
     private ValueCallback<Integer> readRSSICallback;
     private Callback writeCallback;
     private Callback registerNotifyCallback;
     private ValueCallback<Integer> requestMTUCallback;
+
+    //当需要写入很长数据时，按20字节切割 分批发送。
     private List<byte[]> writeQueue = new ArrayList<>();
 
     public Peripheral(BluetoothDevice device, int advertisingRSSI, byte[] scanRecord) {
@@ -246,22 +249,22 @@ public class Peripheral extends BluetoothGattCallback {
         byte[] dataValue = characteristic.getValue();
         Log.d(Peripheral.LOG_TAG, "Notify: " + bytesToHex(dataValue) + " from peripheral: " + device.getAddress());
         if (notifyCallback != null) {
-            notifyCallback.invoke(null, dataValue);
+            notifyCallback.invoke(null, new UuidAndBytes(characteristic.getUuid(), dataValue));
         } else {
-            Log.d(Peripheral.LOG_TAG, "onCharacteristicChanged " +  "notifyCallback is  null");
+            Log.d(Peripheral.LOG_TAG, "onCharacteristicChanged notifyCallback is null");
         }
     }
 
     @Override
     public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
         super.onCharacteristicRead(gatt, characteristic, status);
-        String string = readCallback == null ? "readCallback is  null" : "readCallback is no t null";
+        String string = readCallback == null ? "readCallback is  null" : "readCallback is not null";
         byte[] dataValue = characteristic.getValue();
         Log.d(Peripheral.LOG_TAG, "Read: " + bytesToHex(dataValue) + " from peripheral: " + device.getAddress());
         Log.d(Peripheral.LOG_TAG, "onCharacteristicRead " + string+ ", " + BluetoothGatt.GATT_SUCCESS);
         if (readCallback != null) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                readCallback.invoke(null, dataValue);
+                readCallback.invoke(null, new UuidAndBytes(characteristic.getUuid(), dataValue));
             } else {
                 readCallback.invoke("Error reading " + characteristic.getUuid() + " status=" + status);
             }
@@ -388,7 +391,7 @@ public class Peripheral extends BluetoothGattCallback {
 
     }
     @MainThread
-    public void registerNotify(UUID serviceUUID, UUID characteristicUUID, Callback callback, ValueCallback<byte[]> notifyCallback) {
+    public void registerNotify(UUID serviceUUID, UUID characteristicUUID, Callback callback, ValueCallback<UuidAndBytes> notifyCallback) {
         Log.d(Peripheral.LOG_TAG, "registerNotify");
         this.setNotify(serviceUUID, characteristicUUID, true, new Callback() {
             @Override
@@ -445,7 +448,7 @@ public class Peripheral extends BluetoothGattCallback {
         }
     }
 
-    public void read(UUID serviceUUID, UUID characteristicUUID, ValueCallback<byte[]> callback) {
+    public void read(UUID serviceUUID, UUID characteristicUUID, ValueCallback<UuidAndBytes> callback) {
 
         if (!isConnected()) {
             callback.invoke("Device is not connected (read)", null);
@@ -791,7 +794,28 @@ public class Peripheral extends BluetoothGattCallback {
             }
         }
     }
-    private static String bytesToHex(byte[] bytes) {
+
+    public static class UuidAndBytes extends Pair<UUID, byte[]> {
+
+        /**
+         * Constructor for a Pair.
+         *
+         * @param uuid  the first object in the Pair
+         * @param bytes the second object in the pair
+         */
+        public UuidAndBytes(UUID uuid, byte[] bytes) {
+            super(uuid, bytes);
+        }
+
+        public UUID getUUID() {
+            return first;
+        }
+        public byte[] getBytes() {
+            return second;
+        }
+    }
+
+         private static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder("0x");
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));

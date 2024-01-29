@@ -32,6 +32,7 @@ fun ConnectWifiDialog(
                     onValueChange = { text ->
                         wifiName = text
                     },
+                    singleLine = true,
                     label = { Text("WiFi 名称") }
                 )
 
@@ -41,8 +42,8 @@ fun ConnectWifiDialog(
                     onValueChange = { text ->
                         password = text
                     },
+                    singleLine = true,
                     label = { Text("密码") },
-                    visualTransformation = PasswordVisualTransformation()
                 )
             }
         },

@@ -1,5 +1,7 @@
 package com.cleargrass.lib.blue.core;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,5 +32,39 @@ public class UUIDHelper {
 		} else {
 			return longUUID;
 		}
+	}
+
+	/**
+	 * 简化显示UUID （仅对特殊UUID起效）
+	 * @param uuid
+	 * @return
+	 */
+    @NotNull
+    public static String simpler(@NotNull UUID uuid) {
+        String uuidS = uuid.toString();
+		if (uuidS.endsWith("0000-1000-8000-00805f9b34fb")) {
+			uuidS = uuidS.replace("-0000-1000-8000-00805f9b34fb", "");
+			if (uuidS.startsWith("0000")) {
+				uuidS = uuidS.substring(4);
+			}
+		}
+		return uuidS;
+    }
+	/**
+	 * 简化显示UUID
+	 * force 为 true时，仅显示前8个或前4个字符，通常只用于显示，不用于比较两个uuid
+	 * @param uuid
+	 * @return
+	 */
+	@NotNull
+	public static String simpler(@NotNull UUID uuid, boolean force) {
+		if (!force) {
+			return simpler(uuid);
+		}
+		String uuidS = uuid.toString().substring(0, 8);
+		if (uuidS.startsWith("0000")) {
+			uuidS = uuidS.substring(4);
+		}
+		return uuidS;
 	}
 }

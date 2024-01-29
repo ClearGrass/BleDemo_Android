@@ -6,9 +6,12 @@ import android.util.Log
 import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.Callback
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
+import com.cleargrass.lib.blue.core.Peripheral.UuidAndBytes
 import com.cleargrass.lib.blue.core.Peripheral.ValueCallback
+import com.cleargrass.lib.blue.core.UUIDHelper
 import com.cleargrass.lib.blue.core.UUIDs
 import java.lang.IllegalStateException
+import java.util.UUID
 
 data class Command(val action: String, val uuid: String, val bytes: ByteArray, val succ: Boolean? = null)
 typealias DebugCommandListener = (Command) -> Unit
@@ -24,7 +27,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         get() = peripheral.device.address ?: "??:??:??:??:??:??"
     val scanData: ByteArray
         get() = peripheral.advertisingBytes ?: byteArrayOf()
-    private val notifyCallback: ValueCallback<ByteArray>
+    private val notifyCallback: ValueCallback<Peripheral.UuidAndBytes>
     private val reponseCollector = ResponseCollector();
     public var debugCommandListener: DebugCommandListener?= null
 
@@ -33,12 +36,12 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         if (bytes != null && bytes.size >= 13) {
             deviceId = peripheral.device.address.replace(":", "")
         }
-        notifyCallback = object: ValueCallback<ByteArray>() {
-            override fun invoke(error: String?, value: ByteArray?) {
-                value?.let {value ->
-                    Log.d("blue", "Response: ${QpUtils.parseProtocol(value)}")
-                    debugCommandListener?.invoke(Command("notify", "", value, null))
-                    reponseCollector.collect(value)
+        notifyCallback = object: ValueCallback<Peripheral.UuidAndBytes>() {
+            override fun invoke(error: String?, uuidBytes: Peripheral.UuidAndBytes?) {
+                uuidBytes?.let {uuidBytes ->
+                    Log.d("blue", "Response: ${QpUtils.parseProtocol(uuidBytes.bytes)} Uuid: ${uuidBytes.uuid}")
+                    debugCommandListener?.invoke(Command("notify", UUIDHelper.simpler(uuidBytes.uuid), uuidBytes.bytes, null))
+                    reponseCollector.collect(uuidBytes)
                 }
             }
         }
@@ -130,33 +133,35 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
             }
         })
     }
-    fun writeInternalCommand(context: Context, command: ByteArray, responder: CommandResponder) {
+    private fun writeInternalCommand(context: Context, command: ByteArray, responder: CommandResponder) {
         if (command == null) {
             return;
         }
+        reponseCollector.setResponder(command[1], UUIDs.COMMON_READ, responder)
         peripheral.write(UUIDs.SERVICE, UUIDs.COMMON_WRITE, command, if (debugCommandListener != null ) object : Callback() {
             override fun invoke(error: String?, value: Boolean?) {
                 if (value == false) {
+                    reponseCollector.off()
                     debugCommandListener?.invoke(Command("write Error", "0001", command, false))
                 }
             }
         } else null)
         debugCommandListener?.invoke(Command("write", "0001", command))
-        reponseCollector.setResponder(command[1], responder)
     }
     fun writeCommand(context: Context, command: ByteArray, responder: CommandResponder) {
         if (command == null) {
             return;
         }
+        reponseCollector.setResponder(command[1], UUIDs.MY_READ, responder)
         peripheral.write(UUIDs.SERVICE, UUIDs.MY_WRITE, command, if (debugCommandListener != null ) object : Callback() {
             override fun invoke(error: String?, value: Boolean?) {
                 if (value == false) {
+                    reponseCollector.off()
                     debugCommandListener?.invoke(Command("write Error", "0015", command, false))
                 }
             }
         } else null)
         debugCommandListener?.invoke(Command("write", "0015", command))
-        reponseCollector.setResponder(command[1], responder)
     }
 
     fun disconnect(focus: Boolean = false) {
@@ -168,37 +173,63 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
 /**
  * 用于接收蓝牙指令，
  * 并调用相应的回调函数
- * 这里的作用是收集“长”命令，收到所有数据后，再回调。
+ * 这里的作用是收集“长”命令（wifi列表），收到所有数据后，再回调。
  */
 internal class ResponseCollector() {
     var waitingType: Byte = 0
+    var waitingCharacteristic: UUID? = null
     var isCollecting = false
     private var nextResponder: CommandResponder?= null
     private var respMap = mutableMapOf<Int, ByteArray>()
-    public fun setResponder(type: Byte, responder: CommandResponder) {
+    public fun setResponder(type: Byte, fromCharacteristic: UUID, responder: CommandResponder) {
         if (isCollecting) {
             throw IllegalStateException("ResponseCollector is collecting")
         }
         if (waitingType > 0) {
             throw IllegalStateException("ResponseCollector is waiting for 0x${waitingType.toString(16)}, not 0x${type.toString(16)}")
         }
+        waitingCharacteristic = fromCharacteristic
         nextResponder = responder
         waitingType = type
         respMap.clear()
     }
-    public fun collect(command: ByteArray) {
+    public fun collect(uuidAndBytes: UuidAndBytes) {
+        return collect(uuidAndBytes.uuid, uuidAndBytes.bytes)
+    }
+    public fun collect(fromUUID: UUID, bytes: ByteArray) {
+        if (waitingCharacteristic!= fromUUID) {
+            // 如果不是目标特征的响应 则忽略
+            return
+        }
         if (waitingType == 0.toByte()) {
             throw IllegalStateException("ResponseCollector is not waiting")
         }
         if (nextResponder == null) {
             throw IllegalStateException("ResponseCollector nextResponder == null")
         }
-        isCollecting = true;
+        if (waitingCharacteristic!= fromUUID) {
+            return
+        }
         /**
          * 目前只有 0x07 和 0x04 命令 是多页的。都是获取wifi列表命令，0x04已废弃。
          */
         val reponseHasMultiPage = waitingType == 0x7.toByte() || waitingType == 0x4.toByte()
-        Protocol.from(command, reponseHasMultiPage)?.let { protocol ->
+        if (bytes[1].isFF() || !reponseHasMultiPage) {
+            // 是 04FF010000 格式数据，或 非分页，直接回调
+            nextResponder?.let { responder ->
+                /**
+                 * 先设置reponder为空，再回调。
+                 * 防止在回调中再次调用
+                 * 防止invoke里的responder无法被设置
+                 */
+                off();
+                responder.invoke(bytes)
+            }
+            return
+        }
+
+        isCollecting = true;
+        Protocol.from(bytes, reponseHasMultiPage)?.let { protocol ->
             if (protocol.type == waitingType) {
                 respMap[protocol.page] = protocol.data!!
             }
@@ -208,6 +239,9 @@ internal class ResponseCollector() {
                 var data = byteArrayOf(-1, waitingType)
                 for (i in 1..protocol.count) {
                     data += respMap[i]!!
+                }
+                if (!reponseHasMultiPage) {
+                    data[0] = (data.size - 1).toByte()
                 }
                 nextResponder?.let { responder ->
                     /**
@@ -225,6 +259,7 @@ internal class ResponseCollector() {
     fun off() {
         nextResponder = null
         waitingType = 0
+        waitingCharacteristic = null
         isCollecting = false
         respMap.clear()
     }

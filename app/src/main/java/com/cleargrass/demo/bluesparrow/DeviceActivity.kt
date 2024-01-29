@@ -40,9 +40,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.cleargrass.demo.bluesparrow.data.ScanResultDevice
 import com.cleargrass.demo.bluesparrow.ui.theme.QpDemoBlueSparrowTheme
 import com.cleargrass.lib.blue.BlueManager
+import com.cleargrass.lib.blue.BuildConfig
 import com.cleargrass.lib.blue.Command
 import com.cleargrass.lib.blue.QingpingDevice
 import com.cleargrass.lib.blue.QpUtils
@@ -59,7 +62,6 @@ class DeviceActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val device = intent.getParcelableExtra<ScanResultDevice>("device")!!
-
         setContent {
             QpDemoBlueSparrowTheme {
                 // A surface container using the 'background' color from the theme
@@ -99,6 +101,7 @@ fun DeviceDetail(d: ScanResultDevice) {
     }
     LaunchedEffect(key1 = device) {
         device?.debugCommandListener = { command ->
+            // 这是 蓝牙命令的每一个回调都会显示到界面
             debugCommands = debugCommands + command
         }
     }
@@ -123,12 +126,14 @@ fun DeviceDetail(d: ScanResultDevice) {
                         enabled = !isLoading,
                         onClick = {
                             isLoading = true
+                            debugCommands = debugCommands + Command("Connecting", d.macAddress, byteArrayOf())
                             device?.connectBind(
                                     context = context,
                                     tokenString = "AABBCCDDEEFF",
                                     statusChange = object: OnConnectionStatusCallback {
                                         override fun onPeripheralConnected(peripheral: Peripheral?) {
                                             isConnected = true
+                                            debugCommands = debugCommands + Command("[Connected]", d.macAddress, byteArrayOf())
                                         }
 
                                         override fun onPeripheralDisconnected(
@@ -136,11 +141,13 @@ fun DeviceDetail(d: ScanResultDevice) {
                                             error: Exception?
                                         ) {
                                             isConnected = false
+                                            debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
                                         }
 
                                     }
                                 ) { bindR ->
                                     Log.e("blue", "connectBind: $bindR")
+                                    debugCommands = debugCommands + Command("[Bind] Result", if (bindR) "SUCCESS" else "FAILED", byteArrayOf())
                                     isLoading = false
                                 }
                                 Log.e("blue", "正在连接...")
@@ -174,18 +181,25 @@ fun DeviceDetail(d: ScanResultDevice) {
             }
 
             Inputer(
-                enabled = true || isConnected && !isLoading,
+                enabled = BuildConfig.DEBUG || isConnected && !isLoading,
                 onSendMessage = {
                     Log.d("blue", "will write $it")
                     device?.writeCommand(context = context, command = QpUtils.hexToBytes(it)) { it ->
                         Log.d("blue", "did get ${it.display()}")
+
+                        //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
+                        // WIFI列表
                         if (it[0].isFF() && it[1] == 0x7.toByte()) {
                             // 这是WIFI 列表
                             val data = it.slice(2 until it.size)
-                            debugCommands += Command( "${
+                            debugCommands += Command( "parse WIFI列表",
                                 data.toByteArray().string()
-                                    .replace("\t", "\n")}\n",
-                                "WIFI列表", byteArrayOf())
+                                    .replace("\t", "\n"), it)
+                        }
+
+                        // 连接WIFI结果
+                        if (it[1] == 0x01.toByte()) {
+                            debugCommands += Command("parse 连接WIFI", if (it[2] == 1.toByte()) "连接成功" else "连接失败", it)
                         }
                     }
                 }, menuItems = listOf(Pair("AP LIST(07)", "0107"), Pair("连接WIFI(01)", "")), onMenuClicked = { idx, string, onCommandCreated ->
@@ -195,7 +209,6 @@ fun DeviceDetail(d: ScanResultDevice) {
                     } else if (idx == 1) {
                         // 连接wifi连接wifi
                         showInputWifi = onCommandCreated
-//                        onCommandCreated("")
                     }
                 }
             )
@@ -205,8 +218,9 @@ fun DeviceDetail(d: ScanResultDevice) {
             ConnectWifiDialog(
                 onConnect = { wifiName, password ->
                     Log.d("blue", "Connect wifi $wifiName $password")
-                    // `"${wifi}","${password}"`
+                    // 这里创建 连接WIFI的命令，数据主体是： `"${wifi}","${password}"`
                     var command = "\"${wifiName}\",\"${password}\""
+
                     showInputWifi?.invoke( QpUtils.wrapProtocol(1, QpUtils.stringToBytes(command)).display() )
                     showInputWifi = null
                 },
@@ -261,6 +275,7 @@ fun CommandText(command: Command) {
         Text(
             command.action + "(" + command.uuid + ")\n" + command.bytes.display(),
             Modifier.padding(4.dp),
+
         )
     }
 }

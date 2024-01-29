@@ -37,6 +37,13 @@ public object BlueManager {
             ) {
                 return false
             }
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return false
+            }
         } else {
             if (ActivityCompat.checkSelfPermission(
                     context,
@@ -92,7 +99,16 @@ public object BlueManager {
         if (bluetoothAdapter?.isEnabled != true) {
             throw  IllegalStateException("Bluetooth not enabled!")
         }
+
         val peripheral = retrieveOrCreatePeripheral(address);
+        // 检查设备是否已连接
+        if (peripheral?.isConnected == true) {
+            Log.d(LOG_TAG, "Peripheral (${address}) was connected. callback!")
+            peripheral.setOnConnectStatusChange(onConnectStatusCallback)
+            onConnectStatusCallback.onPeripheralConnected(peripheral)
+            return peripheral
+        }
+        Log.d(LOG_TAG, "Peripheral (${address}) connecting... ")
         peripheral?.connect(context, object: Callback() {
             override fun invoke(error: String?, value: Boolean?) {
                 if (value == true) {
