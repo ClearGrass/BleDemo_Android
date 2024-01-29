@@ -6,8 +6,8 @@ package com.cleargrass.lib.blue
 object QpUtils {
     private val hexArray = "0123456789ABCDEF".toCharArray()
 
-    fun hexToBytes(randomHex: String): ByteArray {
-        val randomHex = randomHex.removePrefix("0x").trim();
+    fun hexToBytes(randomHex1: String): ByteArray {
+        val randomHex = randomHex1.removePrefix("0x").replace(Regex("[^0-9A-Za-z]"), "") .trim()
         return ByteArray(randomHex.length / 2) {
             randomHex.substring(it * 2, it * 2 + 2).toInt(16).toByte()
         }
@@ -15,12 +15,28 @@ object QpUtils {
     fun stringToBytes(string: String): ByteArray {
         return string.toByteArray()
     }
+
+    /**
+     * Wrap的作用是把命令数据用协议包裹起来。
+     * 青萍协议的格式为：
+     *   1字节长度
+     *   1字节协议类型
+     *   N字节数据
+     *   比如 对于 0x11 01 112233445566778899AABBCCDDEEFF00
+     *           长度  绑定  数据
+     *       对于 0x11 02 112233445566778899AABBCCDDEEFF00
+     *           长度  验证  数据
+     *       对于 0x01 07
+     *           长度  取wifi列表
+     * @param protocol 协议类型
+     * @param bytes 数据
+     */
     fun wrapProtocol(protocol: Byte, bytes: ByteArray): ByteArray {
         return byteArrayOf((bytes.size + 1).toByte(), protocol) +  bytes
     }
     fun parseProtocol(bytes: ByteArray, withPage:Boolean = false): Protocol? {
         if (bytes.size < 2) {
-            return null;
+            return null
         }
         if (bytes[1].isFF()) {  //如： 0x04FF010000
             // 第一个字节是0x04，表示数据长度是0x04
@@ -35,11 +51,11 @@ object QpUtils {
         } else {
             // 解析协议
             // 其它如：0x06081122334466
-            val type = bytes[1];
+            val type = bytes[1]
             // 从第三位开始，都是数据
             val data = bytes.sliceArray(2 until bytes.size )
             val succ = true
-            return if (!withPage) {
+            return if (!withPage || bytes.size < 3) {
                 Protocol(type, succ, data)
             } else {
                 // 对于长数据。如  0x13-07-1e-01-22-51-69-6e-67-70-69-6e-67-20-41-50-22-2c-34-2c
