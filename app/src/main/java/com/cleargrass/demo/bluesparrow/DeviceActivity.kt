@@ -2,13 +2,16 @@ package com.cleargrass.demo.bluesparrow
 
 import android.os.Build
 import android.os.Bundle
+import android.text.Selection
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -37,7 +41,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
@@ -88,7 +97,7 @@ fun DeviceDetail(d: ScanResultDevice) {
         BlueManager.retrieveOrCreatePeripheral(d.macAddress)?.let { QingpingDevice(it) }
     }
     var toCommonCharacteristic by remember {
-        mutableStateOf(false)
+        mutableStateOf(true)
     }
     var isLoading by remember {
         mutableStateOf(false)
@@ -124,20 +133,15 @@ fun DeviceDetail(d: ScanResultDevice) {
                     IconButton(
                         enabled = !isLoading,
                         onClick = {
-
-                        }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "verify")
-                    }
-                    IconButton(
-                        enabled = !isLoading,
-                        onClick = {
                             showInputToken = { token, bind ->
                                 showInputToken = null
                                 isLoading = true
                                 debugCommands = debugCommands + Command("Connecting and ${if (bind) "Bind" else "Verify"}", d.macAddress, token.toByteArray())
+                                toCommonCharacteristic = true
                                 val connectionStatusCallback = object: OnConnectionStatusCallback {
                                     override fun onPeripheralConnected(peripheral: Peripheral?) {
                                         isConnected = true
+                                        toCommonCharacteristic = true
                                         debugCommands = debugCommands + Command("[Connected]", d.macAddress, byteArrayOf())
                                     }
 
@@ -146,29 +150,48 @@ fun DeviceDetail(d: ScanResultDevice) {
                                         error: Exception?
                                     ) {
                                         isConnected = false
+                                        toCommonCharacteristic = true
                                         debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
                                     }
                                 }
-                                if (bind) {
-                                    device?.connectBind(
-                                        context = context,
-                                        tokenString = token,
-                                        statusChange = connectionStatusCallback
-                                    ) { bindResult ->
-                                        Log.e("blue", "connectBind: $bindResult")
-                                        debugCommands = debugCommands + Command("[Bind] Result", if (bindResult) "SUCCESS" else "FAILED", byteArrayOf())
-                                        isLoading = false
+                                try {
+                                    if (bind) {
+                                        device?.connectBind(
+                                            context = context,
+                                            tokenString = token,
+                                            statusChange = connectionStatusCallback
+                                        ) { bindResult ->
+                                            Log.e("blue", "connectBind: $bindResult")
+                                            debugCommands = debugCommands + Command(
+                                                "[Bind] Result",
+                                                if (bindResult) "SUCCESS" else "FAILED",
+                                                byteArrayOf()
+                                            )
+                                            isLoading = false
+                                            toCommonCharacteristic = !bindResult
+                                        }
+                                    } else {
+                                        device?.connectVerify(
+                                            context = context,
+                                            tokenString = token,
+                                            statusChange = connectionStatusCallback
+                                        ) { verifyResult ->
+                                            Log.e("blue", "connectVerify: $verifyResult")
+                                            debugCommands = debugCommands + Command(
+                                                "[Verify] Result",
+                                                if (verifyResult) "SUCCESS" else "FAILED",
+                                                byteArrayOf()
+                                            )
+                                            isLoading = false
+                                            toCommonCharacteristic = !verifyResult
+                                        }
                                     }
-                                } else {
-                                    device?.connectVerify(
-                                        context = context,
-                                        tokenString = token,
-                                        statusChange = connectionStatusCallback
-                                    ) { verifyResult ->
-                                        Log.e("blue", "connectVerify: $verifyResult")
-                                        debugCommands = debugCommands + Command("[Verify] Result", if (verifyResult) "SUCCESS" else "FAILED", byteArrayOf())
-                                        isLoading = false
-                                    }
+                                } catch (e: Exception) {
+                                    debugCommands = debugCommands + Command(
+                                        "[Error]",
+                                        e.localizedMessage,
+                                        byteArrayOf()
+                                    )
                                 }
                             }
                             Log.e("blue", "正在连接...")
@@ -206,6 +229,10 @@ fun DeviceDetail(d: ScanResultDevice) {
                 targetUuid = if (toCommonCharacteristic) "0001" else "0015",
                 onSendMessage = {
                     Log.d("blue", "will write $it")
+                    if (device == null) {
+                        debugCommands += Command( "Not connected", d.macAddress, QpUtils.hexToBytes(it))
+                        return@Inputer
+                    }
                     if (!toCommonCharacteristic) {
                         device?.writeCommand(context = context, command = QpUtils.hexToBytes(it)) { it ->
                             Log.d("blue", "ble response  ${it.display()}")
@@ -307,6 +334,8 @@ fun CommandList(modifier:Modifier = Modifier, commands: List<Command>, content: 
 }
 @Composable
 fun CommandText(command: Command) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current;
     Box(modifier = Modifier
         .fillMaxWidth()
         .padding(8.dp)
@@ -314,7 +343,10 @@ fun CommandText(command: Command) {
         Text(
             command.action
                     + "(" + command.uuid + ")\n" + (if (command.bytes.isNotEmpty()) command.bytes.display() else "").trim(),
-            Modifier.padding(4.dp),
+            Modifier.padding(4.dp).clickable(enabled = command.bytes.isNotEmpty()) {
+                clipboardManager.setText(AnnotatedString(command.bytes.display()))
+                Toast.makeText(context, "已复制Bytes", Toast.LENGTH_SHORT).show()
+            },
         )
     }
 }

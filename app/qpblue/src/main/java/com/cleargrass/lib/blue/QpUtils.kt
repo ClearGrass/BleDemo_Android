@@ -118,13 +118,13 @@ public fun ByteArray.string(intRange: IntRange? = null): String {
     val byteArray = if (intRange == null) this else sliceArray(intRange)
     return String(byteArray)
 }
-public fun ByteArray.display(intRange: IntRange? = null):String {
+public fun ByteArray.display(intRange: IntRange? = null, dimter: String = "-"):String {
     val byteArray = if (intRange == null) this else sliceArray(intRange)
     var result = ""
     byteArray.forEach {
-        result += it.display() + "-"
+        result += it.display() + dimter
     }
-    return "0x${result.trimEnd('-')}"
+    return "0x${result.removeSuffix(dimter)}"
 }
 public fun Byte.display(prefix: Boolean = false): String {
     return this.toUByte().toString(16).padStart(2, '0').let {

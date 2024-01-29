@@ -28,6 +28,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cleargrass.lib.blue.QpUtils
 import com.cleargrass.lib.blue.isGoodToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,7 +39,7 @@ fun InputToken(
     onCancel: () -> Unit
 ) {
     var tokenString by remember { mutableStateOf("") }
-    var bindYesVerifyFalse by remember { mutableStateOf(true) }
+    var bindYesVerifyFalse by remember { mutableStateOf(false) }
     AlertDialog(
         title = { Text("请输入 Token")},
         text = {
@@ -62,18 +65,19 @@ fun InputToken(
                     }
                 )
                 Row(verticalAlignment= Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
-                    Text(text = "连接")
+                    Text(text = "验证Token")
                     Switch(modifier = Modifier.padding(4.dp), checked = bindYesVerifyFalse, onCheckedChange = {
                         bindYesVerifyFalse = it
                     })
-                    Text(text = "连接绑定Token")
+                    Text(text = "绑定Token")
                 }
             }
         },
         confirmButton = {
             Button(onClick = {
-                // 连接 WiFi
-                onTokenString(tokenString, bindYesVerifyFalse)
+                CoroutineScope(Dispatchers.Main).launch {
+                    onTokenString(tokenString, bindYesVerifyFalse)
+                }
             }) {
                 Text("连接")
             }

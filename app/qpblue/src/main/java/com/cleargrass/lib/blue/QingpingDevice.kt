@@ -75,23 +75,35 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         })
     }
     private fun bind(context: Context, randomBytes: ByteArray, responder: ActionResult) {
+        var callOnce = false
         writeInternalCommand(context, QpUtils.wrapProtocol(0x01, randomBytes)) { bindResponse ->
             if (QpUtils.parseProtocol(bindResponse)?.resultSuccess != true) {
-                responder.invoke(false)
+                if (!callOnce) {
+                    responder.invoke(false)
+                    callOnce = true;
+                }
             } else {
                 verify(context, randomBytes, responder)
             }
         }
     }
     private fun verify(context: Context, randomBytes: ByteArray, responder: ActionResult) {
+        var callOnce = false
         writeInternalCommand(context, QpUtils.wrapProtocol(0x02, randomBytes)) { verifyResponse ->
             if (QpUtils.parseProtocol(verifyResponse)?.resultSuccess != true) {
-                responder.invoke(false)
+                if (!callOnce) {
+                    responder.invoke(false)
+                    callOnce = true;
+                }
             } else {
                 peripheral.registerNotify(UUIDs.SERVICE, UUIDs.MY_READ, object: Callback() {
                     override fun invoke(error: String?, value: Boolean?) {
-                        responder.invoke(true)
+                        if (!callOnce) {
+                            responder.invoke(true)
+                            callOnce = true;
+                        }
                         if (value != true) {
+                            // 验证失败就断开连接
                             peripheral.disconnect()
                         }
                     }
@@ -105,20 +117,21 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         if (!tokenString.isGoodToken()) {
             throw IllegalArgumentException("Invalid token: $tokenString")
         }
-        var hasCalledResponder = false
         connect(context, object :
             OnConnectionStatusCallback {
             override fun onPeripheralConnected(peripheral: Peripheral?) {
                 statusChange.onPeripheralConnected(peripheral)
-                bind(context, QpUtils.stringToBytes(tokenString), responder)
-                hasCalledResponder = true
+                bind(context, QpUtils.stringToBytes(tokenString), object: ActionResult{
+                    override fun invoke(value: Boolean) {
+                        responder.invoke(value)
+                        peripheral?.setOnConnectStatusChange(statusChange)
+                    }
+                })
             }
             override fun onPeripheralDisconnected(peripheral: Peripheral?, error: Exception?) {
                 statusChange.onPeripheralDisconnected(peripheral, error)
-                if (!hasCalledResponder) {
-                    responder.invoke(false)
-                    hasCalledResponder = true
-                }
+                responder.invoke(false)
+                peripheral?.setOnConnectStatusChange(statusChange)
             }
         })
     }
@@ -126,20 +139,21 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         if (!tokenString.isGoodToken()) {
             throw IllegalArgumentException("Invalid token: $tokenString")
         }
-        var hasCalledResponder = false
         connect(context, object :
             OnConnectionStatusCallback {
             override fun onPeripheralConnected(peripheral: Peripheral?) {
                 statusChange.onPeripheralConnected(peripheral)
-                verify(context, QpUtils.stringToBytes(tokenString), responder)
-                hasCalledResponder = true
+                verify(context, QpUtils.stringToBytes(tokenString), object: ActionResult{
+                    override fun invoke(value: Boolean) {
+                        responder.invoke(value)
+                        peripheral?.setOnConnectStatusChange(statusChange)
+                    }
+                })
             }
             override fun onPeripheralDisconnected(peripheral: Peripheral?, error: Exception?) {
                 statusChange.onPeripheralDisconnected(peripheral, error)
-                if (!hasCalledResponder) {
-                    responder.invoke(false)
-                    hasCalledResponder = true
-                }
+                responder.invoke(false)
+                peripheral?.setOnConnectStatusChange(statusChange)
             }
         })
     }

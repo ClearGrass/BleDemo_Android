@@ -15,6 +15,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +55,9 @@ fun ConnectWifiDialog(
         confirmButton = {
             Button(onClick = {
                 // 连接 WiFi
-                onConnect(wifiName, password)
+                CoroutineScope(Dispatchers.Main).launch {
+                    onConnect(wifiName, password)
+                }
             }) {
                 Text("连接")
             }
