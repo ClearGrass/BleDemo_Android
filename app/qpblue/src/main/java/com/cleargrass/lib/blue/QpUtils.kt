@@ -2,12 +2,14 @@
 
 package com.cleargrass.lib.blue
 
+import kotlin.random.Random
+
 
 object QpUtils {
     private val hexArray = "0123456789ABCDEF".toCharArray()
 
     fun hexToBytes(randomHex1: String): ByteArray {
-        val randomHex = randomHex1.removePrefix("0x").replace(Regex("[^0-9A-Za-z]"), "") .trim()
+        val randomHex = randomHex1.removePrefix("0x").replace(Regex("[^0-9A-Fa-f]"), "") .trim()
         return ByteArray(randomHex.length / 2) {
             randomHex.substring(it * 2, it * 2 + 2).toInt(16).toByte()
         }
@@ -68,9 +70,38 @@ object QpUtils {
         }
     }
 
-    fun isGoodToken(tokenString: String): Boolean {
-        return tokenString.matches(Regex("^[0-9a-zA-Z]{12,16}$"))
+    fun randomToken(): String {
+        Random.nextFloat().let {
+            when (it) {
+                in 0f..0.3f -> {
+                    return "1234567890"
+                }
+
+                in 0.33f..0.55f -> {
+                    return "1234567890ABCDEF"
+                }
+
+                in 0.55f..0.77f -> {
+                    return "ABCDEFGHIJKLMN"
+                }
+
+                in 0.77f..0.9f -> {
+                    return "sefhapiw31csaef32"
+                }
+
+                else -> {
+                    return "iTalkBB@foo321bar!"
+                }
+            }
+        }
     }
+}
+
+fun String.isGoodToken(): Boolean {
+    return matches(Regex("^[0-9a-zA-Z!@#$%^&()_=]{12,18}$"))
+}
+fun String.isHex(): Boolean {
+    return matches(Regex("^[0-9A-Fa-f]*$"))
 }
 
 private fun ByteArray.number(intRange: IntRange? = null): Int {

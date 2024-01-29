@@ -11,8 +11,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +54,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun Inputer(
     enabled: Boolean = true,
+    targetUuid: String = "0001",
     onSendMessage: (String) -> Unit,
     menuItems: List<Pair<String, String>>,
     onMenuClicked: ((index: Int, Pair<String, String>, onCommandCreated: (newCommand: String) -> Unit)-> Unit)?
@@ -76,6 +82,33 @@ fun Inputer(
                         menuShow = false
                     }
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("写到0001", Modifier) },
+                        onClick = {
+                            onMenuClicked?.invoke(-1, Pair("0001", "")) {}
+                            menuShow = false
+                        },
+                        trailingIcon = {
+                            if (targetUuid == "0001") Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = ""
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("写到0015", Modifier) },
+                        onClick = {
+                            onMenuClicked?.invoke(-2, Pair("0015", "")) {}
+                            menuShow = false
+                        },
+                        trailingIcon = {
+                            if (targetUuid == "0015") Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = ""
+                            )
+                        }
+                    )
+                    Divider()
                     menuItems.forEachIndexed { index, item ->
                         DropdownMenuItem(
                             text = { Text(item.first, Modifier) },

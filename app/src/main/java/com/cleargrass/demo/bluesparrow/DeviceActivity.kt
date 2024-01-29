@@ -87,11 +87,17 @@ fun DeviceDetail(d: ScanResultDevice) {
     val device = remember {
         BlueManager.retrieveOrCreatePeripheral(d.macAddress)?.let { QingpingDevice(it) }
     }
+    var toCommonCharacteristic by remember {
+        mutableStateOf(false)
+    }
     var isLoading by remember {
         mutableStateOf(false)
     }
     var isConnected by remember {
         mutableStateOf(false)
+    }
+    var showInputToken by remember {
+        mutableStateOf<((token: String, bind: Boolean) -> Unit)?>(null)
     }
     var showInputWifi by remember {
         mutableStateOf<((newCommand: String) -> Unit)?>(null)
@@ -125,32 +131,47 @@ fun DeviceDetail(d: ScanResultDevice) {
                     IconButton(
                         enabled = !isLoading,
                         onClick = {
-                            isLoading = true
-                            debugCommands = debugCommands + Command("Connecting", d.macAddress, byteArrayOf())
-                            device?.connectBind(
-                                    context = context,
-                                    tokenString = "AABBCCDDEEFF",
-                                    statusChange = object: OnConnectionStatusCallback {
-                                        override fun onPeripheralConnected(peripheral: Peripheral?) {
-                                            isConnected = true
-                                            debugCommands = debugCommands + Command("[Connected]", d.macAddress, byteArrayOf())
-                                        }
-
-                                        override fun onPeripheralDisconnected(
-                                            peripheral: Peripheral?,
-                                            error: Exception?
-                                        ) {
-                                            isConnected = false
-                                            debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
-                                        }
-
+                            showInputToken = { token, bind ->
+                                showInputToken = null
+                                isLoading = true
+                                debugCommands = debugCommands + Command("Connecting and ${if (bind) "Bind" else "Verify"}", d.macAddress, token.toByteArray())
+                                val connectionStatusCallback = object: OnConnectionStatusCallback {
+                                    override fun onPeripheralConnected(peripheral: Peripheral?) {
+                                        isConnected = true
+                                        debugCommands = debugCommands + Command("[Connected]", d.macAddress, byteArrayOf())
                                     }
-                                ) { bindR ->
-                                    Log.e("blue", "connectBind: $bindR")
-                                    debugCommands = debugCommands + Command("[Bind] Result", if (bindR) "SUCCESS" else "FAILED", byteArrayOf())
-                                    isLoading = false
+
+                                    override fun onPeripheralDisconnected(
+                                        peripheral: Peripheral?,
+                                        error: Exception?
+                                    ) {
+                                        isConnected = false
+                                        debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
+                                    }
                                 }
-                                Log.e("blue", "正在连接...")
+                                if (bind) {
+                                    device?.connectBind(
+                                        context = context,
+                                        tokenString = token,
+                                        statusChange = connectionStatusCallback
+                                    ) { bindResult ->
+                                        Log.e("blue", "connectBind: $bindResult")
+                                        debugCommands = debugCommands + Command("[Bind] Result", if (bindResult) "SUCCESS" else "FAILED", byteArrayOf())
+                                        isLoading = false
+                                    }
+                                } else {
+                                    device?.connectVerify(
+                                        context = context,
+                                        tokenString = token,
+                                        statusChange = connectionStatusCallback
+                                    ) { verifyResult ->
+                                        Log.e("blue", "connectVerify: $verifyResult")
+                                        debugCommands = debugCommands + Command("[Verify] Result", if (verifyResult) "SUCCESS" else "FAILED", byteArrayOf())
+                                        isLoading = false
+                                    }
+                                }
+                            }
+                            Log.e("blue", "正在连接...")
                         }) {
                         Icon(Icons.Filled.Send, contentDescription = "connect")
                     }
@@ -182,27 +203,41 @@ fun DeviceDetail(d: ScanResultDevice) {
 
             Inputer(
                 enabled = BuildConfig.DEBUG || isConnected && !isLoading,
+                targetUuid = if (toCommonCharacteristic) "0001" else "0015",
                 onSendMessage = {
                     Log.d("blue", "will write $it")
-                    device?.writeCommand(context = context, command = QpUtils.hexToBytes(it)) { it ->
-                        Log.d("blue", "did get ${it.display()}")
+                    if (!toCommonCharacteristic) {
+                        device?.writeCommand(context = context, command = QpUtils.hexToBytes(it)) { it ->
+                            Log.d("blue", "ble response  ${it.display()}")
+                            //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
+                            // WIFI列表
+                            if (it[0].isFF() && it[1] == 0x7.toByte()) {
+                                // 这是WIFI 列表
+                                val data = it.slice(2 until it.size)
+                                debugCommands += Command( "parse WIFI列表",
+                                    data.toByteArray().string()
+                                        .replace("\t", "\n"), it)
+                            }
 
-                        //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
-                        // WIFI列表
-                        if (it[0].isFF() && it[1] == 0x7.toByte()) {
-                            // 这是WIFI 列表
-                            val data = it.slice(2 until it.size)
-                            debugCommands += Command( "parse WIFI列表",
-                                data.toByteArray().string()
-                                    .replace("\t", "\n"), it)
+                            // 连接WIFI结果
+                            if (it[1] == 0x01.toByte()) {
+                                debugCommands += Command("parse 连接WIFI", if (it[2] == 1.toByte()) "连接成功" else "连接失败", it)
+                            }
                         }
-
-                        // 连接WIFI结果
-                        if (it[1] == 0x01.toByte()) {
-                            debugCommands += Command("parse 连接WIFI", if (it[2] == 1.toByte()) "连接成功" else "连接失败", it)
+                    } else {
+                        device?.writeInternalCommand(context = context, command = QpUtils.hexToBytes(it)) {
+                            Log.d("blue", "ble response ${it.display()}")
                         }
                     }
-                }, menuItems = listOf(Pair("AP LIST(07)", "0107"), Pair("连接WIFI(01)", "")), onMenuClicked = { idx, string, onCommandCreated ->
+
+                },
+                menuItems = listOf(Pair("AP LIST(07)", "0107"), Pair("连接WIFI(01)", "")),
+                onMenuClicked = { idx, string, onCommandCreated ->
+                    if (idx < 0) {
+                        // 切换命令特征
+                        toCommonCharacteristic = idx == -1
+                        return@Inputer
+                    }
                     Log.d("blue", "will write $string")
                     if (idx == 0) {
                         // ap列表
@@ -212,7 +247,11 @@ fun DeviceDetail(d: ScanResultDevice) {
                     }
                 }
             )
-
+        }
+        if (showInputToken != null) {
+            InputToken(onTokenString = showInputToken!!, onCancel = {
+                showInputToken = null
+            })
         }
         if (showInputWifi != null) {
             ConnectWifiDialog(
@@ -273,9 +312,9 @@ fun CommandText(command: Command) {
         .padding(8.dp)
         .border(1.dp, if (command.action == "write") Color.Black else Color.Transparent)) {
         Text(
-            command.action + "(" + command.uuid + ")\n" + command.bytes.display(),
+            command.action
+                    + "(" + command.uuid + ")\n" + (if (command.bytes.isNotEmpty()) command.bytes.display() else "").trim(),
             Modifier.padding(4.dp),
-
         )
     }
 }

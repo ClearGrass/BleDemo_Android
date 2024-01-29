@@ -102,38 +102,48 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
     }
 
     fun connectBind(context: Context, tokenString: String, statusChange: OnConnectionStatusCallback, responder: ActionResult) {
-        if (!QpUtils.isGoodToken(tokenString)) {
-            throw IllegalArgumentException("Invalid token")
+        if (!tokenString.isGoodToken()) {
+            throw IllegalArgumentException("Invalid token: $tokenString")
         }
+        var hasCalledResponder = false
         connect(context, object :
             OnConnectionStatusCallback {
             override fun onPeripheralConnected(peripheral: Peripheral?) {
                 statusChange.onPeripheralConnected(peripheral)
                 bind(context, QpUtils.stringToBytes(tokenString), responder)
+                hasCalledResponder = true
             }
             override fun onPeripheralDisconnected(peripheral: Peripheral?, error: Exception?) {
                 statusChange.onPeripheralDisconnected(peripheral, error)
-                responder.invoke(false)
+                if (!hasCalledResponder) {
+                    responder.invoke(false)
+                    hasCalledResponder = true
+                }
             }
         })
     }
     fun connectVerify(context: Context, tokenString: String, statusChange: OnConnectionStatusCallback, responder: ActionResult) {
-        if (!QpUtils.isGoodToken(tokenString)) {
-            throw IllegalArgumentException("Invalid token")
+        if (!tokenString.isGoodToken()) {
+            throw IllegalArgumentException("Invalid token: $tokenString")
         }
+        var hasCalledResponder = false
         connect(context, object :
             OnConnectionStatusCallback {
             override fun onPeripheralConnected(peripheral: Peripheral?) {
                 statusChange.onPeripheralConnected(peripheral)
                 verify(context, QpUtils.stringToBytes(tokenString), responder)
+                hasCalledResponder = true
             }
             override fun onPeripheralDisconnected(peripheral: Peripheral?, error: Exception?) {
                 statusChange.onPeripheralDisconnected(peripheral, error)
-                responder.invoke(false)
+                if (!hasCalledResponder) {
+                    responder.invoke(false)
+                    hasCalledResponder = true
+                }
             }
         })
     }
-    private fun writeInternalCommand(context: Context, command: ByteArray, responder: CommandResponder) {
+    fun writeInternalCommand(context: Context, command: ByteArray, responder: CommandResponder) {
         if (command == null) {
             return;
         }
