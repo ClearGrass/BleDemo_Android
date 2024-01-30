@@ -169,7 +169,7 @@ public class Peripheral extends BluetoothGattCallback {
     @Override
     public void onConnectionStateChange(BluetoothGatt gatta, int status, int newState) {
 
-        Log.d(Peripheral.LOG_TAG, "onConnectionStateChange to " + newState + " on peripheral: " + device.getAddress() + " with status " + status);
+        Log.d(Peripheral.LOG_TAG, "onConnectionStateChange to " + newState + " on peripheral: " + device.getAddress() + " from status " + status);
 
         this.gatt = gatta;
 

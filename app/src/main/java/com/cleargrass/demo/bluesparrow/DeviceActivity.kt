@@ -147,6 +147,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                                         peripheral: Peripheral?,
                                         error: Exception?
                                     ) {
+                                        isLoading = false
                                         isConnected = false
                                         toCommonCharacteristic = true
                                         debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
@@ -200,6 +201,9 @@ fun DeviceDetail(d: ScanResultDevice) {
                     IconButton(
                         enabled = !isLoading,
                         onClick = {
+                            if (isLoading) {
+                                return@IconButton
+                            }
                             if (device != null) {
                                 isLoading = true
                                 device.disconnect()
