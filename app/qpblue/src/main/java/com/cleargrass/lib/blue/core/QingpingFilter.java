@@ -67,11 +67,11 @@ public final class QingpingFilter {
             return false;
         }
 
-        if (isRequestBinding != binding) {
+        if (isRequestBinding && !binding) {
             return false;
         }
 
-        if (isRequestBooting != booting) {
+        if (isRequestBooting && !booting) {
             return false;
         }
 
