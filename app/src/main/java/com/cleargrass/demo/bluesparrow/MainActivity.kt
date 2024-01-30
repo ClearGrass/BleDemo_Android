@@ -132,7 +132,12 @@ fun MainPage() {
                         ) else null, null), object :DeviceScanCallback() {
                             override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
                                 Log.d("blue", "onDeviceInRange: $qingpingDevice")
-                                scanDevice.add(ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData))
+                                ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData).let {
+                                    if (scanDevice.contains(it)) {
+                                        scanDevice.remove(it)
+                                    }
+                                    scanDevice.add(0, it)
+                                }
                             }
 
                             override fun onScanStart() {
