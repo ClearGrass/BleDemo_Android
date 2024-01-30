@@ -9,6 +9,9 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
@@ -19,6 +22,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -26,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.cleargrass.demo.bluesparrow.data.ScanResultDevice
@@ -37,116 +42,13 @@ import com.cleargrass.lib.blue.core.QingpingFilter
 
 class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val context = LocalContext.current;
-            val scanDevice  = remember {
-                mutableStateListOf<ScanResultDevice>(
-                    ScanResultDevice("Name1", "Address", 123, byteArrayOf()),
-                    ScanResultDevice("Name2", "Address", 123, byteArrayOf()),
-                    ScanResultDevice("Name3", "Address", 123, byteArrayOf()),
-                )
-            }
-            var onlyPairing by remember {
-                mutableStateOf(false)
-            }
-            var selectedPrd by remember {
-                mutableStateOf(0)
-            }
-            var isScanning by remember {
-                mutableStateOf(false)
-            }
-            var content by remember {
-                mutableStateOf("")
-            }
+
             QpDemoBlueSparrowTheme {
                 // A surface container using the 'background' color from the theme
-                Scaffold(
-                    modifier = Modifier,
-                    floatingActionButton = {
-                        FloatingActionButton(
-                            modifier = Modifier,
-                            onClick = {
-                                if (isScanning) {
-                                    BlueManager.stopScan()
-                                    return@FloatingActionButton;
-                                }
-                                scanDevice.clear()
-                                if (BlueManager.initBleManager(this)) {
-                                    BlueManager.scan(QingpingFilter.build(onlyPairing, false, if (selectedPrd > 0) byteArrayOf(
-                                        selectedPrd.toByte()
-                                    ) else null, null), object :DeviceScanCallback() {
-                                        override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
-                                            Log.d("blue", "onDeviceInRange: $qingpingDevice")
-                                            scanDevice.add(ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData))
-                                        }
-
-                                        override fun onScanStart() {
-                                            Log.d("blue", "onScanStart")
-                                            isScanning = true;
-                                        }
-
-                                        override fun onScanStop() {
-                                            Log.d("blue", "onScanStop")
-                                            isScanning = false;
-                                        }
-
-                                        override fun onScanFailed(errorCode: Int) {
-                                            Log.d("blue", "onScanFailed $errorCode")
-                                            isScanning = false;
-                                            content = "Scan Failed:$errorCode"
-                                        }
-
-                                    })
-                                } else {
-                                    Log.d("blue", "onScanFailed permission denied")
-                                    content = "Scan Failed: permission denied"
-                                }
-
-                            })
-                        { Icon(imageVector = if (isScanning) Icons.Default.Close else Icons.Default.Refresh, contentDescription = "Add") }
-                    }
-                ) {
-                    Column {
-                        Greeting("Qingping")
-                        FilterBar(
-                            isScanning = isScanning,
-                            selectPrd = selectedPrd,
-                            checkBinding = onlyPairing,
-                            onCheckChange = {
-                                onlyPairing = it
-                            },
-                            onProductTypeChange = {
-                                selectedPrd = it
-                            },
-                        )
-                        DeviceList(scanDevice) {
-                            val intent = Intent(context, DeviceActivity::class.java)
-                            intent.putExtra("device", it)
-                            startActivity(intent)
-                        }
-                    }
-
-                    if (content.isNotEmpty()) {
-                        AlertDialog(
-                            text={
-                                Text(text = content)
-                            },
-                            onDismissRequest = {
-                                content = ""
-                            },
-                            confirmButton = {
-                                Button(onClick = {
-                                    content = ""
-                                }) {
-                                    Text(text = "OK")
-                                }
-                            }
-                        )
-                    }
-                }
+                MainPage()
             }
         }
     }
@@ -186,7 +88,131 @@ class MainActivity : ComponentActivity() {
         BlueManager.stopScan()
     }
 }
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainPage() {
+    val context = LocalContext.current;
+    val scanDevice  = remember {
+        mutableStateListOf<ScanResultDevice>(
+            ScanResultDevice("Name1", "Address", 123, byteArrayOf()),
+            ScanResultDevice("Name2", "Address", 123, byteArrayOf()),
+            ScanResultDevice("Name3", "Address", 123, byteArrayOf()),
+        )
+    }
+    var onlyPairing by remember {
+        mutableStateOf(false)
+    }
+    var selectedPrd by remember {
+        mutableStateOf(0)
+    }
+    var isScanning by remember {
+        mutableStateOf(false)
+    }
+    var filterText by remember {
+        mutableStateOf("")
+    }
+    var content by remember {
+        mutableStateOf("")
+    }
+    Scaffold(
+        modifier = Modifier,
+        floatingActionButton = {
+            FloatingActionButton(
+                modifier = Modifier,
+                onClick = {
+                    if (isScanning) {
+                        BlueManager.stopScan()
+                        return@FloatingActionButton;
+                    }
+                    scanDevice.clear()
+                    if (BlueManager.initBleManager(context)) {
+                        BlueManager.scan(QingpingFilter.build(onlyPairing, false, if (selectedPrd > 0) byteArrayOf(
+                            selectedPrd.toByte()
+                        ) else null, null), object :DeviceScanCallback() {
+                            override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
+                                Log.d("blue", "onDeviceInRange: $qingpingDevice")
+                                scanDevice.add(ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData))
+                            }
 
+                            override fun onScanStart() {
+                                Log.d("blue", "onScanStart")
+                                isScanning = true;
+                            }
+
+                            override fun onScanStop() {
+                                Log.d("blue", "onScanStop")
+                                isScanning = false;
+                            }
+
+                            override fun onScanFailed(errorCode: Int) {
+                                Log.d("blue", "onScanFailed $errorCode")
+                                isScanning = false;
+                                content = "Scan Failed:$errorCode"
+                            }
+
+                        })
+                    } else {
+                        Log.d("blue", "onScanFailed permission denied")
+                        content = "Scan Failed: permission denied"
+                    }
+
+                })
+            { Icon(imageVector = if (isScanning) Icons.Default.Close else Icons.Default.Refresh, contentDescription = "Add") }
+        }
+    ) {
+        Column {
+            Greeting("Qingping")
+            FilterBar(
+                isScanning = isScanning,
+                selectPrd = selectedPrd,
+                checkBinding = onlyPairing,
+                onCheckChange = {
+                    onlyPairing = it
+                },
+                onProductTypeChange = {
+                    selectedPrd = it
+                },
+            )
+            Row {
+                TextField(
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    value = filterText,
+                    singleLine = true,
+                    placeholder = {Text("过滤名称或MAC地址")},
+                    onValueChange = {
+                        filterText = it
+                    })
+            }
+            DeviceList(if (filterText.isEmpty()) scanDevice else scanDevice.filter {
+                it.name.contains(filterText, true)
+                        || it.macAddress.replace(":", "").contains(filterText.replace(":", ""), true)
+            }) {
+                val intent = Intent(context, DeviceActivity::class.java)
+                intent.putExtra("device", it)
+                context.startActivity(intent)
+            }
+        }
+
+        if (content.isNotEmpty()) {
+            AlertDialog(
+                text={
+                    Text(text = content)
+                },
+                onDismissRequest = {
+                    content = ""
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        content = ""
+                    }) {
+                        Text(text = "OK")
+                    }
+                }
+            )
+        }
+    }
+}
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
@@ -199,7 +225,6 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @Composable
 fun GreetingPreview() {
     QpDemoBlueSparrowTheme {
-        Greeting("Android")
-
+        MainPage()
     }
 }
