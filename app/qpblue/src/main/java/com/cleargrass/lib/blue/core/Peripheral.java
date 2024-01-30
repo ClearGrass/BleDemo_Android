@@ -71,6 +71,9 @@ public class Peripheral extends BluetoothGattCallback {
     public byte[] getAdvertisingBytes() {
         return advertisingDataBytes;
     }
+    public int getAdvertisingRSSI() {
+        return advertisingRSSI;
+    }
 
     public void setOnConnectStatusChange(OnConnectionStatusCallback onConnectStatusChange) {
         connectStatusCallback = onConnectStatusChange;

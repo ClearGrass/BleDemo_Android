@@ -2,6 +2,8 @@
 
 package com.cleargrass.lib.blue
 
+import com.cleargrass.lib.blue.data.Protocol
+import com.cleargrass.lib.blue.data.*
 import kotlin.random.Random
 
 
@@ -95,61 +97,4 @@ object QpUtils {
             }
         }
     }
-}
-
-fun String.isGoodToken(): Boolean {
-    return matches(Regex("^[0-9a-zA-Z!@#$%^&()_=]{12,18}$"))
-}
-fun String.isHex(): Boolean {
-    return matches(Regex("^[0-9A-Fa-f]*$"))
-}
-
-private fun ByteArray.number(intRange: IntRange? = null): Int {
-    val byteArray = if (intRange == null) this else sliceArray(intRange)
-    var shl = 0
-    var result = 0
-    byteArray.take(4).forEach {
-        result = result or (it.toInt() shl (shl++)  * 4)
-    }
-    return result
-}
-
-public fun ByteArray.string(intRange: IntRange? = null): String {
-    val byteArray = if (intRange == null) this else sliceArray(intRange)
-    return String(byteArray)
-}
-public fun ByteArray.display(intRange: IntRange? = null, dimter: String = "-"):String {
-    val byteArray = if (intRange == null) this else sliceArray(intRange)
-    var result = ""
-    byteArray.forEach {
-        result += it.display() + dimter
-    }
-    return "0x${result.removeSuffix(dimter)}"
-}
-public fun Byte.display(prefix: Boolean = false): String {
-    return this.toUByte().toString(16).padStart(2, '0').let {
-        if (prefix) "0x$it" else it
-    }
-}
-public fun Byte.isFF(): Boolean {
-    return this == (-1).toByte()
-}
-
-
-data class Protocol(
-    val type: Byte,
-    val resultSuccess: Boolean,
-    val data: ByteArray?,
-    val count: Int = 1,
-    val page: Int = 1,
-) {
-    init {
-
-    }
-    companion object {
-        fun from(bytes: ByteArray, withPage: Boolean = false): Protocol? {
-            return QpUtils.parseProtocol(bytes, withPage)
-        }
-    }
-
 }

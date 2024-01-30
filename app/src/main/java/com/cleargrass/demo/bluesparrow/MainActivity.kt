@@ -39,6 +39,7 @@ import com.cleargrass.lib.blue.BlueManager
 import com.cleargrass.lib.blue.DeviceScanCallback
 import com.cleargrass.lib.blue.QingpingDevice
 import com.cleargrass.lib.blue.core.QingpingFilter
+import com.cleargrass.lib.blue.data.ScanResultParsed
 
 class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -94,11 +95,7 @@ class MainActivity : ComponentActivity() {
 fun MainPage() {
     val context = LocalContext.current;
     val scanDevice  = remember {
-        mutableStateListOf<ScanResultDevice>(
-            ScanResultDevice("Name1", "Address", 123, byteArrayOf()),
-            ScanResultDevice("Name2", "Address", 123, byteArrayOf()),
-            ScanResultDevice("Name3", "Address", 123, byteArrayOf()),
-        )
+        mutableStateListOf<ScanResultDevice>()
     }
     var onlyPairing by remember {
         mutableStateOf(false)
@@ -132,11 +129,12 @@ fun MainPage() {
                         ) else null, null), object :DeviceScanCallback() {
                             override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
                                 Log.d("blue", "onDeviceInRange: $qingpingDevice")
-                                ScanResultDevice(qingpingDevice.name, qingpingDevice.address, 1, qingpingDevice.scanData).let {
-                                    if (scanDevice.contains(it)) {
-                                        scanDevice.remove(it)
+                                ScanResultDevice(qingpingDevice).let {
+                                    scanDevice.remove(it)
+                                    scanDevice.add(it)
+                                    scanDevice.sortWith { o1, o2 ->
+                                        o2?.rssi?.compareTo(o1?.rssi ?: 0) ?: 0
                                     }
-                                    scanDevice.add(0, it)
                                 }
                             }
 

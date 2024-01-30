@@ -1,7 +1,5 @@
 package com.cleargrass.demo.bluesparrow
 
-import android.os.Parcel
-import android.os.Parcelable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,10 +9,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cleargrass.demo.bluesparrow.data.ScanResultDevice
-import com.cleargrass.lib.blue.display
+import com.cleargrass.lib.blue.data.*
 
 @Composable
 fun DeviceList(devices: List<ScanResultDevice>, onItemClicked: (ScanResultDevice) -> Unit) {
@@ -48,18 +47,35 @@ fun DeviceItem(device: ScanResultDevice, onClicked: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "RSSI: ${device.signal}",
+                    text = "RSSI: ${device.rssi}",
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.End
                 )
             }
-            Text(
-                text = device.macAddress,
-                modifier = Modifier.padding(8.dp),
-                style = MaterialTheme.typography.titleSmall,
-                textAlign = TextAlign.Start
-            )
-            Text(text = device.data.display(), modifier = Modifier.padding(8.dp))
+            Row {
+
+                Text(
+                    text = device.macAddress,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    textAlign = TextAlign.Start
+                )
+                Text(
+                    text = "PID: 0x${device.productId.toString(16)} (${device.productId})",
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.Black
+                )
+                if (device.isBinding) {
+                    Text(
+                        text = "  [binding]",
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color.Red
+                    )
+                }
+            }
+            Text(text = device.data.rawBytes.display(), modifier = Modifier.padding(8.dp))
         }
     }
 }

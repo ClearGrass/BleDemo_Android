@@ -10,6 +10,8 @@ import com.cleargrass.lib.blue.core.Peripheral.UuidAndBytes
 import com.cleargrass.lib.blue.core.Peripheral.ValueCallback
 import com.cleargrass.lib.blue.core.UUIDHelper
 import com.cleargrass.lib.blue.core.UUIDs
+import com.cleargrass.lib.blue.data.Protocol
+import com.cleargrass.lib.blue.data.*
 import java.lang.IllegalStateException
 import java.util.UUID
 
@@ -27,6 +29,8 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         get() = peripheral.device.address ?: "??:??:??:??:??:??"
     val scanData: ByteArray
         get() = peripheral.advertisingBytes ?: byteArrayOf()
+    val rssi: Int
+        get() = peripheral.advertisingRSSI
     private val notifyCallback: ValueCallback<Peripheral.UuidAndBytes>
     private val reponseCollector = ResponseCollector();
     public var debugCommandListener: DebugCommandListener?= null

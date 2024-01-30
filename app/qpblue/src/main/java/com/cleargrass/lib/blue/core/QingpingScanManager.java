@@ -63,8 +63,8 @@ public class QingpingScanManager {
         }
     }
 
-    private static final ParcelUuid qp_uuid1 = ParcelUuid.fromString("0000fff9-0000-1000-8000-00805f9b34fb");
-    private static final ParcelUuid qp_uuid2 = ParcelUuid.fromString("0000fdcd-0000-1000-8000-00805f9b34fb");
+    private static final ParcelUuid qp_uuid = ParcelUuid.fromString("0000fdcd-0000-1000-8000-00805f9b34fb");
+    private static final ParcelUuid qp_uuid_legacy = ParcelUuid.fromString("0000fff9-0000-1000-8000-00805f9b34fb");
 
     private android.bluetooth.le.ScanCallback mScanCallback = new android.bluetooth.le.ScanCallback() {
         @Override
@@ -88,7 +88,7 @@ public class QingpingScanManager {
             }
 
             Set<ParcelUuid> uuidsSet = record.getServiceData().keySet();
-            if (!uuidsSet.contains(qp_uuid1) && !uuidsSet.contains(qp_uuid2)) {
+            if (!uuidsSet.contains(qp_uuid) && !uuidsSet.contains(qp_uuid_legacy)) {
                 return;
             }
             String name = result.getDevice().getName();

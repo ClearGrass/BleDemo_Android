@@ -60,9 +60,7 @@ import com.cleargrass.lib.blue.QingpingDevice
 import com.cleargrass.lib.blue.QpUtils
 import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
-import com.cleargrass.lib.blue.display
-import com.cleargrass.lib.blue.isFF
-import com.cleargrass.lib.blue.string
+import com.cleargrass.lib.blue.data.*
 import java.lang.Exception
 import java.lang.Integer.max
 
@@ -220,7 +218,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                     .fillMaxWidth()
                     .padding(8.dp), debugCommands) {
                 Card(modifier = Modifier.padding(8.dp)) {
-                    Text(text = d.data.display(), modifier = Modifier.padding(8.dp))
+                    Text(text = d.data.rawBytes.display(), modifier = Modifier.padding(8.dp))
                 }
             }
 
@@ -359,6 +357,7 @@ fun GreetingPreview2() {
             "Sparrow",
             "11:22:33:44:55:66",
             1,
-            QpUtils.hexToBytes("0x11223344AABBCCDE")))
+            ScanResultParsed(QpUtils.hexToBytes("0x11223344AABBCCDE"))
+        ))
     }
 }
