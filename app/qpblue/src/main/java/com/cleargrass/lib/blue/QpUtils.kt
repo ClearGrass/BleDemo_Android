@@ -75,15 +75,15 @@ object QpUtils {
     fun randomToken(): String {
         Random.nextFloat().let {
             when (it) {
-                in 0f..0.3f -> {
+                in 0f..0.4f -> {
                     return "1234567890ABCDEF"
                 }
 
-                in 0.3f..0.7f -> {
-                    return "ABCDEFGHIJKLMN"
+                in 0.4f..0.8f -> {
+                    return "ABCDEFGHIJKLMNOP"
                 }
                 else -> {
-                    return "iTalkBB@foo321bar!"
+                    return "iTalkBB@foo321!"
                 }
             }
         }
