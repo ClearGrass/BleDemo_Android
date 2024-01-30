@@ -80,7 +80,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
     }
     private fun bind(context: Context, randomBytes: ByteArray, responder: ActionResult) {
         var callOnce = false
-        writeInternalCommand(context, QpUtils.wrapProtocol(0x01, randomBytes)) { bindResponse ->
+        writeInternalCommand(QpUtils.wrapProtocol(0x01, randomBytes)) { bindResponse ->
             if (QpUtils.parseProtocol(bindResponse)?.resultSuccess != true) {
                 if (!callOnce) {
                     responder.invoke(false)
@@ -93,7 +93,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
     }
     private fun verify(context: Context, randomBytes: ByteArray, responder: ActionResult) {
         var callOnce = false
-        writeInternalCommand(context, QpUtils.wrapProtocol(0x02, randomBytes)) { verifyResponse ->
+        writeInternalCommand(QpUtils.wrapProtocol(0x02, randomBytes)) { verifyResponse ->
             if (QpUtils.parseProtocol(verifyResponse)?.resultSuccess != true) {
                 if (!callOnce) {
                     responder.invoke(false)
@@ -161,8 +161,8 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
             }
         })
     }
-    fun writeInternalCommand(context: Context, command: ByteArray, responder: CommandResponder) {
-        if (command == null) {
+    fun writeInternalCommand(command: ByteArray, responder: CommandResponder) {
+        if (command == null || command.size < 2) {
             return;
         }
         reponseCollector.setResponder(command[1], UUIDs.COMMON_READ, responder)
@@ -176,8 +176,8 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         } else null)
         debugCommandListener?.invoke(Command("write", "0001", command))
     }
-    fun writeCommand(context: Context, command: ByteArray, responder: CommandResponder) {
-        if (command == null) {
+    fun writeCommand(command: ByteArray, responder: CommandResponder) {
+        if (command == null || command.size < 2) {
             return;
         }
         reponseCollector.setResponder(command[1], UUIDs.MY_READ, responder)
@@ -190,6 +190,23 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
             }
         } else null)
         debugCommandListener?.invoke(Command("write", "0015", command))
+    }
+
+    fun readDeviceInfoValue(characteristic: UUID, responder: CommandResponder) {
+        return readValue(UUIDs.SERVICE, characteristic, responder)
+    }
+    fun readValue(service: UUID, characteristic: UUID, responder: CommandResponder) {
+        peripheral.read(service, characteristic, object: ValueCallback<UuidAndBytes>() {
+            override fun invoke(error: String?, value: UuidAndBytes?) {
+                value?.let {
+                    debugCommandListener?.invoke(Command("read", UUIDHelper.simpler(value.uuid), it.bytes))
+                    responder(it.bytes)
+                }
+                if (error != null) {
+                    throw Exception(error)
+                }
+            }
+        })
     }
 
     fun disconnect(focus: Boolean = false) {
@@ -239,9 +256,14 @@ internal class ResponseCollector() {
             return
         }
         /**
-         * 目前只有 0x07 和 0x04 命令 是多页的。都是获取wifi列表命令，0x04已废弃。
+         *
+         * 目前 0x1E 命令 是多页的。是取clientid的
+         * 目前 0x07 和 0x04 命令 是多页的。都是获取wifi列表命令，0x04已废弃。
          */
-        val reponseHasMultiPage = waitingType == 0x7.toByte() || waitingType == 0x4.toByte()
+        val reponseHasMultiPage =
+                (waitingCharacteristic == UUIDs.MY_READ
+                        && (waitingType == 0x7.toByte() || waitingType == 0x4.toByte()))
+                || (waitingCharacteristic == UUIDs.COMMON_READ && waitingType == 0x1e.toByte())
         if (bytes[1].isFF() || !reponseHasMultiPage) {
             // 是 04FF010000 格式数据，或 非分页，直接回调
             nextResponder?.let { responder ->

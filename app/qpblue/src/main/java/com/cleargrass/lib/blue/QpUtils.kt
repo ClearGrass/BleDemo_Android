@@ -76,21 +76,12 @@ object QpUtils {
         Random.nextFloat().let {
             when (it) {
                 in 0f..0.3f -> {
-                    return "1234567890"
-                }
-
-                in 0.33f..0.55f -> {
                     return "1234567890ABCDEF"
                 }
 
-                in 0.55f..0.77f -> {
+                in 0.3f..0.7f -> {
                     return "ABCDEFGHIJKLMN"
                 }
-
-                in 0.77f..0.9f -> {
-                    return "sefhapiw31csaef32"
-                }
-
                 else -> {
                     return "iTalkBB@foo321bar!"
                 }

@@ -266,12 +266,13 @@ public class Peripheral extends BluetoothGattCallback {
         Log.d(Peripheral.LOG_TAG, "Read: " + bytesToHex(dataValue) + " from peripheral: " + device.getAddress());
         Log.d(Peripheral.LOG_TAG, "onCharacteristicRead " + string+ ", " + BluetoothGatt.GATT_SUCCESS);
         if (readCallback != null) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                readCallback.invoke(null, new UuidAndBytes(characteristic.getUuid(), dataValue));
-            } else {
-                readCallback.invoke("Error reading " + characteristic.getUuid() + " status=" + status);
-            }
+            ValueCallback<UuidAndBytes> callback = readCallback;
             readCallback = null;
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                callback.invoke(null, new UuidAndBytes(characteristic.getUuid(), dataValue));
+            } else {
+                callback.invoke("Error reading " + characteristic.getUuid() + " status=" + status);
+            }
         }
     }
 

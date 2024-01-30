@@ -2,7 +2,6 @@ package com.cleargrass.demo.bluesparrow
 
 import android.os.Build
 import android.os.Bundle
-import android.text.Selection
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -19,14 +18,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,16 +37,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import com.cleargrass.demo.bluesparrow.data.ScanResultDevice
 import com.cleargrass.demo.bluesparrow.ui.theme.QpDemoBlueSparrowTheme
 import com.cleargrass.lib.blue.BlueManager
@@ -60,9 +51,12 @@ import com.cleargrass.lib.blue.QingpingDevice
 import com.cleargrass.lib.blue.QpUtils
 import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
+import com.cleargrass.lib.blue.core.UUIDHelper
+import com.cleargrass.lib.blue.core.UUIDs
 import com.cleargrass.lib.blue.data.*
 import java.lang.Exception
 import java.lang.Integer.max
+import java.util.regex.Pattern
 
 class DeviceActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -123,8 +117,8 @@ fun DeviceDetail(d: ScanResultDevice) {
         Column (modifier = Modifier.fillMaxSize()) {
             TopAppBar(title = {
                 Column {
-                    Text(text = d.name)
-                    Text(text = "Device Detail", style = MaterialTheme.typography.titleSmall,)
+                    Text(text = d.macAddress)
+                    Text(text = d.name, style = MaterialTheme.typography.titleSmall,)
                 }
             }, actions={
                 if (!isConnected) {
@@ -134,7 +128,10 @@ fun DeviceDetail(d: ScanResultDevice) {
                             showInputToken = { token, bind ->
                                 showInputToken = null
                                 isLoading = true
-                                debugCommands = debugCommands + Command("Connecting and ${if (bind) "Bind" else "Verify"}", d.macAddress, token.toByteArray())
+                                debugCommands = debugCommands + Command("Connecting and ${if (bind) "Bind" else "Verify"}",
+                                    d.macAddress,
+                                    QpUtils.wrapProtocol(if (bind) 1 else 2, token.toByteArray())
+                                )
                                 toCommonCharacteristic = true
                                 val connectionStatusCallback = object: OnConnectionStatusCallback {
                                     override fun onPeripheralConnected(peripheral: Peripheral?) {
@@ -236,46 +233,48 @@ fun DeviceDetail(d: ScanResultDevice) {
                         return@Inputer
                     }
                     if (!toCommonCharacteristic) {
-                        device?.writeCommand(context = context, command = QpUtils.hexToBytes(it)) { it ->
+                        device.writeCommand(command = QpUtils.hexToBytes(it)) { it ->
                             Log.d("blue", "ble response  ${it.display()}")
                             //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
                             // WIFI列表
                             if (it[0].isFF() && it[1] == 0x7.toByte()) {
                                 // 这是WIFI 列表
                                 val data = it.slice(2 until it.size)
-                                debugCommands += Command( "parse WIFI列表",
-                                    data.toByteArray().string()
-                                        .replace("\t", "\n"), it)
+                                debugCommands += Command( "parse", "WIFI列表", it)
                             }
 
                             // 连接WIFI结果
                             if (it[1] == 0x01.toByte()) {
-                                debugCommands += Command("parse 连接WIFI", if (it[2] == 1.toByte()) "连接成功" else "连接失败", it)
+                                debugCommands += Command("parse", if (it[2] == 1.toByte()) "连接WIFI成功" else "连接WIFI失败", it)
                             }
                         }
                     } else {
-                        device?.writeInternalCommand(context = context, command = QpUtils.hexToBytes(it)) {
+                        device.writeInternalCommand(command = QpUtils.hexToBytes(it)) {
                             Log.d("blue", "ble response ${it.display()}")
+
+                            if (it[0].isFF() && it[1] == 0x1e.toByte()) {
+                                // 这是WIFI 列表
+                                debugCommands += Command("parse", "0002; client_id", it)
+                            }
                         }
                     }
 
                 },
-                menuItems = listOf(Pair("AP LIST(07)", "0107"), Pair("连接WIFI(01)", "")),
-                onMenuClicked = { idx, string, onCommandCreated ->
-                    if (idx < 0) {
-                        // 切换命令特征
-                        toCommonCharacteristic = idx == -1
-                        return@Inputer
-                    }
-                    Log.d("blue", "will write $string")
-                    if (idx == 0) {
-                        // ap列表
-                    } else if (idx == 1) {
-                        // 连接wifi连接wifi
-                        showInputWifi = onCommandCreated
-                    }
+                menuItems = listOf(Pair("AP LIST(07)", "0107"), Pair("连接WIFI(01)", ""), Pair("client_id(1E)", "011E"))
+            ) { idx, string, onCommandCreated ->
+                if (idx < 0) {
+                    // 切换命令特征
+                    toCommonCharacteristic = idx == -1
+                    return@Inputer
                 }
-            )
+                Log.d("blue", "will write $string")
+                if (idx == 0) {
+                    // ap列表
+                } else if (idx == 1) {
+                    // 连接wifi连接wifi
+                    showInputWifi = onCommandCreated
+                }
+            }
         }
         if (showInputToken != null) {
             InputToken(onTokenString = showInputToken!!, onCancel = {
@@ -344,15 +343,27 @@ fun CommandText(command: Command) {
         .border(1.dp, if (command.action == "write") Color.Black else Color.Transparent)) {
         Text(
             command.action
-                    + "(" + command.uuid + ")\n" + (if (command.bytes.isNotEmpty()) command.bytes.display() else "").trim(),
+                    + "(" + command.uuid + ")\n"
+                    + (if (command.bytes.isNotEmpty()) command.bytes.display() else "")
+                    + if (command.bytes.size > 5 && !command.bytes[1].isFF())
+                            (command.bytes.slice(2 until command.bytes.size).toByteArray().string().trim().let {
+                            if (it.isNotEmpty()) {
+                                // 替换 \t 是为了方便看
+                                return@let "\n[string: ${it.replace("\t", "\n")}]"
+                            } else {
+                                ""
+                            }
+                        }) else ""
+
+                .trim(),
             Modifier.padding(4.dp).clickable(enabled = command.bytes.isNotEmpty()) {
                 clipboardManager.setText(AnnotatedString(command.bytes.display()))
                 Toast.makeText(context, "已复制Bytes", Toast.LENGTH_SHORT).show()
             },
         )
+
     }
 }
-
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview2() {
