@@ -224,7 +224,7 @@ fun DeviceDetail(d: ScanResultDevice) {
             }
 
             Inputer(
-                enabled = BuildConfig.DEBUG || isConnected && !isLoading,
+                enabled = isConnected && !isLoading,
                 targetUuid = if (toCommonCharacteristic) "0001" else "0015",
                 onSendMessage = {
                     Log.d("blue", "will write $it")
