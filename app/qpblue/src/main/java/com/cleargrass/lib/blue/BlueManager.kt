@@ -53,8 +53,12 @@ public object BlueManager {
                 return false
             }
         }
-        bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        qingpingScan = QingpingScanManager(context)
+        if (bluetoothManager == null) {
+            bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        }
+        if (qingpingScan == null) {
+            qingpingScan = QingpingScanManager(context)
+        }
         return bluetoothAdapter?.isEnabled == true
     }
     @MainThread@SuppressLint("MissingPermission")
