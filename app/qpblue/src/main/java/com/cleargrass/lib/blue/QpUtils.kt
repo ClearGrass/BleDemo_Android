@@ -35,8 +35,12 @@ object QpUtils {
      * @param protocol 协议类型
      * @param bytes 数据
      */
-    fun wrapProtocol(protocol: Byte, bytes: ByteArray): ByteArray {
-        return byteArrayOf((bytes.size + 1).toByte(), protocol) +  bytes
+    fun wrapProtocol(protocol: Byte, bytes: ByteArray? = null): ByteArray {
+        return if (bytes != null) {
+            byteArrayOf((bytes.size + 1).toByte(), protocol) + bytes
+        } else {
+            byteArrayOf(1, protocol)
+        }
     }
     fun parseProtocol(bytes: ByteArray, withPage:Boolean = false): Protocol? {
         if (bytes.size < 2) {

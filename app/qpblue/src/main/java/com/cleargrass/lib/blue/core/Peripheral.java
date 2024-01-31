@@ -396,15 +396,11 @@ public class Peripheral extends BluetoothGattCallback {
     }
     @MainThread
     public void registerNotify(UUID serviceUUID, UUID characteristicUUID, Callback callback, ValueCallback<UuidAndBytes> notifyCallback) {
+        Peripheral.this.notifyCallback = notifyCallback;
         Log.d(Peripheral.LOG_TAG, "registerNotify");
         this.setNotify(serviceUUID, characteristicUUID, true, new Callback() {
             @Override
             public void invoke(String error, Boolean value) {
-                if (value) {
-                    Peripheral.this.notifyCallback = notifyCallback;
-                } else {
-                    Peripheral.this.notifyCallback = null;
-                }
                 callback.invoke(error, value);
             }
         });
@@ -819,7 +815,7 @@ public class Peripheral extends BluetoothGattCallback {
         }
     }
 
-         private static String bytesToHex(byte[] bytes) {
+    private static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder("0x");
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));

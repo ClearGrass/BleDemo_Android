@@ -100,19 +100,17 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
                     callOnce = true;
                 }
             } else {
-                peripheral.registerNotify(UUIDs.SERVICE, UUIDs.MY_READ, object: Callback() {
-                    override fun invoke(error: String?, value: Boolean?) {
-                        if (!callOnce) {
-                            responder.invoke(true)
-                            callOnce = true;
+                if (!callOnce) {
+                    responder.invoke(true)
+                    callOnce = true;
+                }
+                writeInternalCommand(QpUtils.wrapProtocol(0x0D)) {
+                    peripheral.registerNotify(UUIDs.SERVICE, UUIDs.MY_READ, object: Callback() {
+                        override fun invoke(error: String?, value: Boolean?) {
+                            Log.e("blue", "registerNotify(0016):" + (error ?: "") + "result: $value")
                         }
-                        if (value != true) {
-                            // 验证失败就断开连接
-                            peripheral.disconnect()
-                        }
-                    }
-                }, this@QingpingDevice.notifyCallback);
-
+                    }, this@QingpingDevice.notifyCallback);
+                }
             }
         }
     }
@@ -165,6 +163,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         if (command == null || command.size < 2) {
             return;
         }
+        reponseCollector.off()
         reponseCollector.setResponder(command[1], UUIDs.COMMON_READ, responder)
         peripheral.write(UUIDs.SERVICE, UUIDs.COMMON_WRITE, command, if (debugCommandListener != null ) object : Callback() {
             override fun invoke(error: String?, value: Boolean?) {
@@ -180,6 +179,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         if (command == null || command.size < 2) {
             return;
         }
+        reponseCollector.off()
         reponseCollector.setResponder(command[1], UUIDs.MY_READ, responder)
         peripheral.write(UUIDs.SERVICE, UUIDs.MY_WRITE, command, if (debugCommandListener != null ) object : Callback() {
             override fun invoke(error: String?, value: Boolean?) {
