@@ -31,7 +31,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         get() = peripheral.advertisingBytes ?: byteArrayOf()
     val rssi: Int
         get() = peripheral.advertisingRSSI
-    private val notifyCallback: ValueCallback<Peripheral.UuidAndBytes>
+    private val notifyCallback: ValueCallback<UuidAndBytes>
     private val reponseCollector = ResponseCollector();
     public var debugCommandListener: DebugCommandListener?= null
 
@@ -40,8 +40,8 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         if (bytes != null && bytes.size >= 13) {
             deviceId = peripheral.device.address.replace(":", "")
         }
-        notifyCallback = object: ValueCallback<Peripheral.UuidAndBytes>() {
-            override fun invoke(error: String?, uuidBytes: Peripheral.UuidAndBytes?) {
+        notifyCallback = object: ValueCallback<UuidAndBytes>() {
+            override fun invoke(error: String?, uuidBytes: UuidAndBytes?) {
                 uuidBytes?.let {uuidBytes ->
                     Log.d("blue", "Response: ${QpUtils.parseProtocol(uuidBytes.bytes)} Uuid: ${uuidBytes.uuid}")
                     debugCommandListener?.invoke(Command("notify", UUIDHelper.simpler(uuidBytes.uuid), uuidBytes.bytes, null))
@@ -242,17 +242,12 @@ internal class ResponseCollector() {
         return collect(uuidAndBytes.uuid, uuidAndBytes.bytes)
     }
     public fun collect(fromUUID: UUID, bytes: ByteArray) {
-        if (waitingCharacteristic!= fromUUID) {
+        if (waitingCharacteristic != fromUUID) {
             // 如果不是目标特征的响应 则忽略
             return
         }
-        if (waitingType == 0.toByte()) {
-            throw IllegalStateException("ResponseCollector is not waiting")
-        }
-        if (nextResponder == null) {
-            throw IllegalStateException("ResponseCollector nextResponder == null")
-        }
-        if (waitingCharacteristic!= fromUUID) {
+        if (waitingType == 0.toByte() || nextResponder == null) {
+            // 不是一马事儿，忽略
             return
         }
         /**

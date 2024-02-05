@@ -88,7 +88,7 @@ fun DeviceDetail(d: ScanResultDevice) {
     val device = remember {
         BlueManager.retrieveOrCreatePeripheral(d.macAddress)?.let { QingpingDevice(it) }
     }
-    var toCommonCharacteristic by remember {
+    var toCommonCharacteristic = remember {
         mutableStateOf(true)
     }
     var isLoading by remember {
@@ -132,11 +132,11 @@ fun DeviceDetail(d: ScanResultDevice) {
                                     d.macAddress,
                                     QpUtils.wrapProtocol(if (bind) 1 else 2, token.toByteArray())
                                 )
-                                toCommonCharacteristic = true
+                                toCommonCharacteristic.value = true
                                 val connectionStatusCallback = object: OnConnectionStatusCallback {
                                     override fun onPeripheralConnected(peripheral: Peripheral?) {
                                         isConnected = true
-                                        toCommonCharacteristic = true
+                                        toCommonCharacteristic.value = true
                                         debugCommands = debugCommands + Command("[Connected]", d.macAddress, byteArrayOf())
                                     }
 
@@ -146,7 +146,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                                     ) {
                                         isLoading = false
                                         isConnected = false
-                                        toCommonCharacteristic = true
+                                        toCommonCharacteristic.value = true
                                         debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
                                     }
                                 }
@@ -164,7 +164,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                                                 byteArrayOf()
                                             )
                                             isLoading = false
-                                            toCommonCharacteristic = !bindResult
+                                            toCommonCharacteristic.value = !bindResult
                                         }
                                     } else {
                                         device?.connectVerify(
@@ -179,7 +179,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                                                 byteArrayOf()
                                             )
                                             isLoading = false
-                                            toCommonCharacteristic = !verifyResult
+                                            toCommonCharacteristic.value = !verifyResult
                                         }
                                     }
                                 } catch (e: Exception) {
@@ -225,14 +225,14 @@ fun DeviceDetail(d: ScanResultDevice) {
 
             Inputer(
                 enabled = isConnected && !isLoading,
-                targetUuid = if (toCommonCharacteristic) "0001" else "0015",
+                targetUuid = if (toCommonCharacteristic.value) "0001" else "0015",
                 onSendMessage = {
                     Log.d("blue", "will write $it")
                     if (device == null) {
                         debugCommands += Command( "Not connected", d.macAddress, QpUtils.hexToBytes(it))
                         return@Inputer
                     }
-                    if (!toCommonCharacteristic) {
+                    if (!toCommonCharacteristic.value) {
                         device.writeCommand(command = QpUtils.hexToBytes(it)) { it ->
                             Log.d("blue", "ble response  ${it.display()}")
                             //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
@@ -264,7 +264,7 @@ fun DeviceDetail(d: ScanResultDevice) {
             ) { idx, string, onCommandCreated ->
                 if (idx < 0) {
                     // 切换命令特征
-                    toCommonCharacteristic = idx == -1
+                    toCommonCharacteristic.value = idx == -1
                     return@Inputer
                 }
                 Log.d("blue", "will write $string")
