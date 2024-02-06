@@ -228,67 +228,6 @@ fun DeviceDetail(d: ScanResultDevice) {
                         Icon(Icons.Filled.Close, contentDescription = "disconnect")
                     }
                 }
-                if (device?.productType != null && device.productType != 0x0d.toByte()) {
-                    IconButton(onClick = {
-                        var fileName = when (device.productType.toInt()) {
-                            0x04 -> "0x04_hodor_2_1_6.bin"
-                            0x12 -> "0x12_parrot_2_6_0.bin"
-                            else -> null
-                        }
-                        if (fileName != null) {
-                            File(context.filesDir, fileName).let { firmwareFile ->
-                                if (!firmwareFile.exists()){
-                                    val inputStream = context.assets.open(fileName)
-                                    val outputStream = FileOutputStream(firmwareFile)
-                                    val buffer = ByteArray(1024)
-                                    var read: Int
-                                    while (inputStream.read(buffer).also { read = it } != -1) {
-                                        outputStream.write(buffer, 0, read)
-                                    }
-                                    outputStream.flush()
-                                    outputStream.close()
-                                    inputStream.close()
-                                }
-
-                                debugCommands += DebugCommand(
-                                    "Upgrading", firmwareFile.absolutePath, byteArrayOf()
-                                )
-                                otaHelper.execOta(device.peripheral.device, firmwareFile.absolutePath, object: GattOtaCallback {
-                                    override fun onOtaStatusChanged(
-                                        statusCode: Int,
-                                        info: String?,
-                                        connection: GattConnection?,
-                                        controller: OtaController?
-                                    ) {
-                                        debugCommands += DebugCommand("OTA_Statue",
-                                            "statusCode=$statusCode info=$info", byteArrayOf())
-                                    }
-
-                                    override fun onOtaProgressUpdate(
-                                        progress: Int,
-                                        connection: GattConnection?,
-                                        controller: OtaController?
-                                    ) {
-                                        if (debugCommands.last().action == "OTA_Progress") {
-                                            debugCommands = debugCommands.dropLast(1)
-                                        }
-                                        debugCommands += DebugCommand("OTA_Progress",
-                                            "$progress%", byteArrayOf())
-                                    }
-
-                                })
-                            }
-
-
-                        } else {
-                            debugCommands += DebugCommand(
-                                "Upgrading", "Firmware not found 0x${device.productType.toString(16)}", byteArrayOf()
-                            )
-                        }
-                    }) {
-                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Upgrade")
-                    }
-                }
             })
             CommandList(
                 Modifier
@@ -312,7 +251,64 @@ fun DeviceDetail(d: ScanResultDevice) {
                         showInputWifi = onCommandCreated
                     },
                     MenuItem("client_id(1E)", "011E", null)
-                ) else listOf()
+                ) else listOf(
+                    MenuItem("更新固件", "") { _, _ ->
+                        var fileName = when (device?.productType?.toInt()) {
+                            0x04 -> "0x04_hodor_2_1_6.bin"
+                            0x12 -> "0x12_parrot_2_6_0.bin"
+                            else -> null
+                        }
+                        if (fileName == null) {
+                            debugCommands += DebugCommand(
+                                "Upgrading", "Firmware not found 0x${device?.productType?.toString(16)}", byteArrayOf()
+                            )
+                            return@MenuItem
+                        }
+
+                        File(context.filesDir, fileName).let { firmwareFile ->
+                            if (!firmwareFile.exists()){
+                                val inputStream = context.assets.open(fileName)
+                                val outputStream = FileOutputStream(firmwareFile)
+                                val buffer = ByteArray(1024)
+                                var read: Int
+                                while (inputStream.read(buffer).also { read = it } != -1) {
+                                    outputStream.write(buffer, 0, read)
+                                }
+                                outputStream.flush()
+                                outputStream.close()
+                                inputStream.close()
+                            }
+
+                            debugCommands += DebugCommand(
+                                "Upgrading", firmwareFile.absolutePath, byteArrayOf()
+                            )
+                            otaHelper.execOta(device!!.peripheral.device, firmwareFile.absolutePath, object: GattOtaCallback {
+                                override fun onOtaStatusChanged(
+                                    statusCode: Int,
+                                    info: String?,
+                                    connection: GattConnection?,
+                                    controller: OtaController?
+                                ) {
+                                    debugCommands += DebugCommand("OTA_Statue",
+                                        "statusCode=$statusCode info=$info", byteArrayOf())
+                                }
+
+                                override fun onOtaProgressUpdate(
+                                    progress: Int,
+                                    connection: GattConnection?,
+                                    controller: OtaController?
+                                ) {
+                                    if (debugCommands.last().action == "OTA_Progress") {
+                                        debugCommands = debugCommands.dropLast(1)
+                                    }
+                                    debugCommands += DebugCommand("OTA_Progress",
+                                        "$progress%", byteArrayOf())
+                                }
+
+                            })
+                        }
+                    }
+                )
             ) {
                 Log.d("blue", "will write $it")
                 if (device == null) {
