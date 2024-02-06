@@ -1,20 +1,15 @@
 package com.cleargrass.demo.bluesparrow
 
-import android.app.Instrumentation
 import android.util.Log
-import android.view.KeyEvent
+import android.view.Menu
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
@@ -27,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -46,6 +37,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+
+typealias MenuClicked = (Int, onCommandCreated: ((String) -> Unit)?) -> Unit
+
+typealias MenuItem = Triple<String, String, MenuClicked?>
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class,
@@ -55,9 +50,9 @@ import androidx.compose.ui.unit.dp
 fun Inputer(
     enabled: Boolean = true,
     targetUuid: String = "0001",
+    onChangeTargetUuid: (String) -> Unit,
+    menuItems: List<MenuItem>,
     onSendMessage: (String) -> Unit,
-    menuItems: List<Pair<String, String>>,
-    onMenuClicked: ((index: Int, Pair<String, String>, onCommandCreated: (newCommand: String) -> Unit)-> Unit)?
 ) {
     // 输入框
     var inputText by remember { mutableStateOf( TextFieldValue()) }
@@ -69,7 +64,7 @@ fun Inputer(
             // 菜单
             Box(modifier = Modifier.align(Alignment.CenterVertically)) {
                 IconButton(
-                    enabled=enabled,
+                    enabled=enabled && menuItems.isNotEmpty(),
                     onClick = {
                     menuShow = !menuShow
                 }) {
@@ -80,12 +75,13 @@ fun Inputer(
                     expanded = menuShow,
                     onDismissRequest = {
                         menuShow = false
-                    }
+                    },
+
                 ) {
                     DropdownMenuItem(
                         text = { Text("写到0001", Modifier) },
                         onClick = {
-                            onMenuClicked?.invoke(-1, Pair("0001", "")) {}
+                            onChangeTargetUuid("0001")
                             menuShow = false
                         },
                         trailingIcon = {
@@ -98,7 +94,7 @@ fun Inputer(
                     DropdownMenuItem(
                         text = { Text("写到0015", Modifier) },
                         onClick = {
-                            onMenuClicked?.invoke(-2, Pair("0015", "")) {}
+                            onChangeTargetUuid("0015")
                             menuShow = false
                         },
                         trailingIcon = {
@@ -117,10 +113,12 @@ fun Inputer(
                                     onSendMessage(item.second)
                                     inputText = inputText.set()
                                 }
-                                onMenuClicked?.invoke(index, item) {newCommand ->
-                                    if (newCommand.isNotEmpty()) {
-                                        onSendMessage(newCommand)
-                                        inputText = inputText.set()
+                                item.third?.let {
+                                    it(index) { newCommand ->
+                                        if (newCommand.isNotEmpty()) {
+                                            onSendMessage(newCommand)
+                                            inputText = inputText.set()
+                                        }
                                     }
                                 }
                                 menuShow = false
@@ -247,9 +245,10 @@ fun ABCDEF(modifier:Modifier, text: String, onClickText: (String) -> Unit) {
 fun InputComponentPreview() {
     Inputer(
         enabled = false,
+        onChangeTargetUuid = {},
         onSendMessage = {},  menuItems = listOf(
-            Pair("WIFI", "0107"),
-            Pair("WIFI_旧", "0104"),
-        ), onMenuClicked = null
+            MenuItem("WIFI", "0107", null),
+            MenuItem("WIFI_旧", "0104", null),
+        )
     )
 }

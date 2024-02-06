@@ -15,13 +15,12 @@ import com.cleargrass.lib.blue.data.*
 import java.lang.IllegalStateException
 import java.util.UUID
 
-data class Command(val action: String, val uuid: String, val bytes: ByteArray, val succ: Boolean? = null)
-typealias DebugCommandListener = (Command) -> Unit
+data class DebugCommand(val action: String, val uuid: String, val bytes: ByteArray, val succ: Boolean? = null)
+typealias DebugCommandListener = (DebugCommand) -> Unit
 typealias CommandResponder = (ByteArray) -> Unit
 typealias ActionResult = (Boolean) -> Unit
 @SuppressLint("MissingPermission")
 class QingpingDevice constructor(var peripheral: Peripheral) {
-    var productType = 0
     var deviceId: String? = null
     val name: String
         get() = peripheral.device.name ?: ""
@@ -31,6 +30,9 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         get() = peripheral.advertisingBytes ?: byteArrayOf()
     val rssi: Int
         get() = peripheral.advertisingRSSI
+    val productType: Byte
+        get() = scanData[8]
+
     private val notifyCallback: ValueCallback<UuidAndBytes>
     private val reponseCollector = ResponseCollector();
     public var debugCommandListener: DebugCommandListener?= null
@@ -44,7 +46,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
             override fun invoke(error: String?, uuidBytes: UuidAndBytes?) {
                 uuidBytes?.let {uuidBytes ->
                     Log.d("blue", "Response: ${QpUtils.parseProtocol(uuidBytes.bytes)} Uuid: ${uuidBytes.uuid}")
-                    debugCommandListener?.invoke(Command("notify", UUIDHelper.simpler(uuidBytes.uuid), uuidBytes.bytes, null))
+                    debugCommandListener?.invoke(DebugCommand("notify", UUIDHelper.simpler(uuidBytes.uuid), uuidBytes.bytes, null))
                     reponseCollector.collect(uuidBytes)
                 }
             }
@@ -169,11 +171,11 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
             override fun invoke(error: String?, value: Boolean?) {
                 if (value == false) {
                     reponseCollector.off()
-                    debugCommandListener?.invoke(Command("write Error", "0001", command, false))
+                    debugCommandListener?.invoke(DebugCommand("write Error", "0001", command, false))
                 }
             }
         } else null)
-        debugCommandListener?.invoke(Command("write", "0001", command))
+        debugCommandListener?.invoke(DebugCommand("write", "0001", command))
     }
     fun writeCommand(command: ByteArray, responder: CommandResponder) {
         if (command == null || command.size < 2) {
@@ -185,11 +187,11 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
             override fun invoke(error: String?, value: Boolean?) {
                 if (value == false) {
                     reponseCollector.off()
-                    debugCommandListener?.invoke(Command("write Error", "0015", command, false))
+                    debugCommandListener?.invoke(DebugCommand("write Error", "0015", command, false))
                 }
             }
         } else null)
-        debugCommandListener?.invoke(Command("write", "0015", command))
+        debugCommandListener?.invoke(DebugCommand("write", "0015", command))
     }
 
     fun readDeviceInfoValue(characteristic: UUID, responder: CommandResponder) {
@@ -199,7 +201,7 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
         peripheral.read(service, characteristic, object: ValueCallback<UuidAndBytes>() {
             override fun invoke(error: String?, value: UuidAndBytes?) {
                 value?.let {
-                    debugCommandListener?.invoke(Command("read", UUIDHelper.simpler(value.uuid), it.bytes))
+                    debugCommandListener?.invoke(DebugCommand("read", UUIDHelper.simpler(value.uuid), it.bytes))
                     responder(it.bytes)
                 }
                 if (error != null) {

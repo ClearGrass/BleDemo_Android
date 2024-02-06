@@ -36,7 +36,7 @@ fun InputToken(
     onTokenString: (tokenString: String, bindYesVerifyFalse: Boolean) -> Unit,
     onCancel: () -> Unit
 ) {
-    var tokenString by remember { mutableStateOf("") }
+    var tokenString by remember { mutableStateOf("ABCDEFGHIJK") }
     var bindYesVerifyFalse by remember { mutableStateOf(false) }
     AlertDialog(
         title = { Text("请输入 Token")},

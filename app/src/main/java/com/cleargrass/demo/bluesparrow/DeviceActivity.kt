@@ -1,7 +1,13 @@
 package com.cleargrass.demo.bluesparrow
 
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -23,6 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,20 +50,28 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cleargrass.demo.bluesparrow.data.ScanResultDevice
+import com.cleargrass.demo.bluesparrow.ota.QpOtaHelper
 import com.cleargrass.demo.bluesparrow.ui.theme.QpDemoBlueSparrowTheme
 import com.cleargrass.lib.blue.BlueManager
-import com.cleargrass.lib.blue.BuildConfig
-import com.cleargrass.lib.blue.Command
+import com.cleargrass.lib.blue.DebugCommand
 import com.cleargrass.lib.blue.QingpingDevice
 import com.cleargrass.lib.blue.QpUtils
 import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
-import com.cleargrass.lib.blue.core.UUIDHelper
-import com.cleargrass.lib.blue.core.UUIDs
 import com.cleargrass.lib.blue.data.*
-import java.lang.Exception
+import com.telink.ota.ble.GattConnection
+import com.telink.ota.ble.GattConnection.ConnectionCallback
+import com.telink.ota.ble.OtaController
+import com.telink.ota.ble.OtaController.GattOtaCallback
+import com.telink.ota.foundation.OtaSetting
+import com.telink.ota.foundation.OtaStatusCode
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.lang.Integer.max
-import java.util.regex.Pattern
+import java.util.UUID
+
 
 class DeviceActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -104,8 +119,10 @@ fun DeviceDetail(d: ScanResultDevice) {
         mutableStateOf<((newCommand: String) -> Unit)?>(null)
     }
     var debugCommands by remember {
-        mutableStateOf(listOf<Command>())
+        mutableStateOf(listOf<DebugCommand>())
     }
+
+    var otaHelper: QpOtaHelper = remember {  QpOtaHelper(context = context)  }
     LaunchedEffect(key1 = device) {
         device?.debugCommandListener = { command ->
             // 这是 蓝牙命令的每一个回调都会显示到界面
@@ -118,7 +135,7 @@ fun DeviceDetail(d: ScanResultDevice) {
             TopAppBar(title = {
                 Column {
                     Text(text = d.macAddress)
-                    Text(text = d.name, style = MaterialTheme.typography.titleSmall,)
+                    Text(text = d.name, style = MaterialTheme.typography.titleSmall)
                 }
             }, actions={
                 if (!isConnected) {
@@ -128,7 +145,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                             showInputToken = { token, bind ->
                                 showInputToken = null
                                 isLoading = true
-                                debugCommands = debugCommands + Command("Connecting and ${if (bind) "Bind" else "Verify"}",
+                                debugCommands = debugCommands + DebugCommand("Connecting and ${if (bind) "Bind" else "Verify"}",
                                     d.macAddress,
                                     QpUtils.wrapProtocol(if (bind) 1 else 2, token.toByteArray())
                                 )
@@ -137,7 +154,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                                     override fun onPeripheralConnected(peripheral: Peripheral?) {
                                         isConnected = true
                                         toCommonCharacteristic.value = true
-                                        debugCommands = debugCommands + Command("[Connected]", d.macAddress, byteArrayOf())
+                                        debugCommands = debugCommands + DebugCommand("[Connected]", d.macAddress, byteArrayOf())
                                     }
 
                                     override fun onPeripheralDisconnected(
@@ -147,7 +164,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                                         isLoading = false
                                         isConnected = false
                                         toCommonCharacteristic.value = true
-                                        debugCommands = debugCommands + Command("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
+                                        debugCommands = debugCommands + DebugCommand("[Disconnected]", error?.localizedMessage.toString(), byteArrayOf())
                                     }
                                 }
                                 try {
@@ -158,13 +175,13 @@ fun DeviceDetail(d: ScanResultDevice) {
                                             statusChange = connectionStatusCallback
                                         ) { bindResult ->
                                             Log.e("blue", "connectBind: $bindResult")
-                                            debugCommands = debugCommands + Command(
+                                            debugCommands = debugCommands + DebugCommand(
                                                 "[Bind] Result",
                                                 if (bindResult) "SUCCESS" else "FAILED",
                                                 byteArrayOf()
                                             )
                                             isLoading = false
-                                            toCommonCharacteristic.value = !bindResult
+                                            toCommonCharacteristic.value = !(bindResult && device.productType == 0x0d.toByte())
                                         }
                                     } else {
                                         device?.connectVerify(
@@ -173,17 +190,17 @@ fun DeviceDetail(d: ScanResultDevice) {
                                             statusChange = connectionStatusCallback
                                         ) { verifyResult ->
                                             Log.e("blue", "connectVerify: $verifyResult")
-                                            debugCommands = debugCommands + Command(
+                                            debugCommands = debugCommands + DebugCommand(
                                                 "[Verify] Result",
                                                 if (verifyResult) "SUCCESS" else "FAILED",
                                                 byteArrayOf()
                                             )
                                             isLoading = false
-                                            toCommonCharacteristic.value = !verifyResult
+                                            toCommonCharacteristic.value = !(verifyResult && device.productType == 0x0d.toByte())
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    debugCommands = debugCommands + Command(
+                                    debugCommands = debugCommands + DebugCommand(
                                         "[Error]",
                                         e.localizedMessage,
                                         byteArrayOf()
@@ -211,7 +228,67 @@ fun DeviceDetail(d: ScanResultDevice) {
                         Icon(Icons.Filled.Close, contentDescription = "disconnect")
                     }
                 }
+                if (device?.productType != null && device.productType != 0x0d.toByte()) {
+                    IconButton(onClick = {
+                        var fileName = when (device.productType.toInt()) {
+                            0x04 -> "0x04_hodor_2_1_6.bin"
+                            0x12 -> "0x12_parrot_2_6_0.bin"
+                            else -> null
+                        }
+                        if (fileName != null) {
+                            File(context.filesDir, fileName).let { firmwareFile ->
+                                if (!firmwareFile.exists()){
+                                    val inputStream = context.assets.open(fileName)
+                                    val outputStream = FileOutputStream(firmwareFile)
+                                    val buffer = ByteArray(1024)
+                                    var read: Int
+                                    while (inputStream.read(buffer).also { read = it } != -1) {
+                                        outputStream.write(buffer, 0, read)
+                                    }
+                                    outputStream.flush()
+                                    outputStream.close()
+                                    inputStream.close()
+                                }
 
+                                debugCommands += DebugCommand(
+                                    "Upgrading", firmwareFile.absolutePath, byteArrayOf()
+                                )
+                                otaHelper.execOta(device.peripheral.device, firmwareFile.absolutePath, object: GattOtaCallback {
+                                    override fun onOtaStatusChanged(
+                                        statusCode: Int,
+                                        info: String?,
+                                        connection: GattConnection?,
+                                        controller: OtaController?
+                                    ) {
+                                        debugCommands += DebugCommand("OTA_Statue",
+                                            "statusCode=$statusCode info=$info", byteArrayOf())
+                                    }
+
+                                    override fun onOtaProgressUpdate(
+                                        progress: Int,
+                                        connection: GattConnection?,
+                                        controller: OtaController?
+                                    ) {
+                                        if (debugCommands.last().action == "OTA_Progress") {
+                                            debugCommands = debugCommands.dropLast(1)
+                                        }
+                                        debugCommands += DebugCommand("OTA_Progress",
+                                            "$progress%", byteArrayOf())
+                                    }
+
+                                })
+                            }
+
+
+                        } else {
+                            debugCommands += DebugCommand(
+                                "Upgrading", "Firmware not found 0x${device.productType.toString(16)}", byteArrayOf()
+                            )
+                        }
+                    }) {
+                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Upgrade")
+                    }
+                }
             })
             CommandList(
                 Modifier
@@ -225,55 +302,50 @@ fun DeviceDetail(d: ScanResultDevice) {
 
             Inputer(
                 enabled = isConnected && !isLoading,
-                targetUuid = if (toCommonCharacteristic.value) "0001" else "0015",
-                onSendMessage = {
-                    Log.d("blue", "will write $it")
-                    if (device == null) {
-                        debugCommands += Command( "Not connected", d.macAddress, QpUtils.hexToBytes(it))
-                        return@Inputer
-                    }
-                    if (!toCommonCharacteristic.value) {
-                        device.writeCommand(command = QpUtils.hexToBytes(it)) { it ->
-                            Log.d("blue", "ble response  ${it.display()}")
-                            //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
-                            // WIFI列表
-                            if (it[0].isFF() && it[1] == 0x7.toByte()) {
-                                // 这是WIFI 列表
-                                val data = it.slice(2 until it.size)
-                                debugCommands += Command( "parse", "WIFI列表", it)
-                            }
-
-                            // 连接WIFI结果
-                            if (it[1] == 0x01.toByte()) {
-                                debugCommands += Command("parse", if (it[2] == 1.toByte()) "连接WIFI成功" else "连接WIFI失败", it)
-                            }
-                        }
-                    } else {
-                        device.writeInternalCommand(command = QpUtils.hexToBytes(it)) {
-                            Log.d("blue", "ble response ${it.display()}")
-
-                            if (it[0].isFF() && it[1] == 0x1e.toByte()) {
-                                // 这是WIFI 列表
-                                debugCommands += Command("parse", "0002; client_id", it)
-                            }
-                        }
-                    }
-
+                targetUuid = if (toCommonCharacteristic.value || device?.productType != 0x0d.toByte()) "0001" else "0015",
+                onChangeTargetUuid = { uuid ->
+                    toCommonCharacteristic.value = uuid == "0001"
                 },
-                menuItems = listOf(Pair("AP LIST(07)", "0107"), Pair("连接WIFI(01)", ""), Pair("client_id(1E)", "011E"))
-            ) { idx, string, onCommandCreated ->
-                if (idx < 0) {
-                    // 切换命令特征
-                    toCommonCharacteristic.value = idx == -1
+                menuItems = if (device?.productType == 0x0d.toByte()) listOf(
+                    MenuItem("AP LIST(07)", "0107", null),
+                    MenuItem("连接WIFI(01)", "") { _, onCommandCreated ->
+                        showInputWifi = onCommandCreated
+                    },
+                    MenuItem("client_id(1E)", "011E", null)
+                ) else listOf()
+            ) {
+                Log.d("blue", "will write $it")
+                if (device == null) {
+                    debugCommands += DebugCommand( "Not connected", d.macAddress, QpUtils.hexToBytes(it))
                     return@Inputer
                 }
-                Log.d("blue", "will write $string")
-                if (idx == 0) {
-                    // ap列表
-                } else if (idx == 1) {
-                    // 连接wifi连接wifi
-                    showInputWifi = onCommandCreated
+                if (!toCommonCharacteristic.value) {
+                    device.writeCommand(command = QpUtils.hexToBytes(it)) { it ->
+                        Log.d("blue", "ble response  ${it.display()}")
+                        //这里把比较特殊的协议回应解析后显示到界面上中方便查看。
+                        // WIFI列表
+                        if (it[0].isFF() && it[1] == 0x7.toByte()) {
+                            // 这是WIFI 列表
+                            val data = it.slice(2 until it.size)
+                            debugCommands += DebugCommand( "parse", "WIFI列表", it)
+                        }
+
+                        // 连接WIFI结果
+                        if (it[1] == 0x01.toByte()) {
+                            debugCommands += DebugCommand("parse", if (it[2] == 1.toByte()) "连接WIFI成功" else "连接WIFI失败", it)
+                        }
+                    }
+                } else {
+                    device.writeInternalCommand(command = QpUtils.hexToBytes(it)) {
+                        Log.d("blue", "ble response ${it.display()}")
+
+                        if (it[0].isFF() && it[1] == 0x1e.toByte()) {
+                            // 这是WIFI 列表
+                            debugCommands += DebugCommand("parse", "0002; client_id", it)
+                        }
+                    }
                 }
+
             }
         }
         if (showInputToken != null) {
@@ -288,10 +360,13 @@ fun DeviceDetail(d: ScanResultDevice) {
                     // 这里创建 连接WIFI的命令，数据主体是： `"${wifi}","${password}"`
                     var command = "\"${wifiName}\",\"${password}\""
 
-                    showInputWifi?.invoke( QpUtils.wrapProtocol(1, QpUtils.stringToBytes(command)).display() )
+                    showInputWifi?.invoke(
+                        QpUtils.wrapProtocol(1, QpUtils.stringToBytes(command)).display()
+                    )
                     showInputWifi = null
                 },
-                onCancel = { showInputWifi = null },)
+                onCancel = { showInputWifi = null },
+            )
         }
         if (isLoading) {
             Box(modifier = Modifier
@@ -317,7 +392,7 @@ fun DeviceDetail(d: ScanResultDevice) {
     }
 }
 @Composable
-fun CommandList(modifier:Modifier = Modifier, commands: List<Command>, content: @Composable () -> Unit) {
+fun CommandList(modifier:Modifier = Modifier, commands: List<DebugCommand>, content: @Composable () -> Unit) {
     val state: LazyListState = rememberLazyListState()
     LaunchedEffect(key1 = commands) {
         state.scrollToItem(max(commands.size - 1, 0))
@@ -334,7 +409,7 @@ fun CommandList(modifier:Modifier = Modifier, commands: List<Command>, content: 
 
 }
 @Composable
-fun CommandText(command: Command) {
+fun CommandText(command: DebugCommand) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current;
     Box(modifier = Modifier
@@ -356,10 +431,14 @@ fun CommandText(command: Command) {
                         }) else ""
 
                 .trim(),
-            Modifier.padding(4.dp).clickable(enabled = command.bytes.isNotEmpty()) {
-                clipboardManager.setText(AnnotatedString(command.bytes.display()))
-                Toast.makeText(context, "已复制Bytes", Toast.LENGTH_SHORT).show()
-            },
+            Modifier
+                .padding(4.dp)
+                .clickable(enabled = command.bytes.isNotEmpty()) {
+                    clipboardManager.setText(AnnotatedString(command.bytes.display()))
+                    Toast
+                        .makeText(context, "已复制Bytes", Toast.LENGTH_SHORT)
+                        .show()
+                },
         )
 
     }

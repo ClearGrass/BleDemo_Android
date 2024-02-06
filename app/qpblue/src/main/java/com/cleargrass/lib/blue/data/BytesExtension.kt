@@ -2,7 +2,7 @@ package com.cleargrass.lib.blue.data
 
 
 fun String.isGoodToken(): Boolean {
-    return matches(Regex("^[0-9a-zA-Z!@#$%^&()_=]{12,16}$"))
+    return matches(Regex("^[0-9a-zA-Z!@#$%^&()_=]{10,16}$"))
 }
 fun String.isHex(): Boolean {
     return matches(Regex("^[0-9A-Fa-f]*$"))

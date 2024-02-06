@@ -138,7 +138,9 @@ public class Peripheral extends BluetoothGattCallback {
             }
         } else {
             Log.d(Peripheral.LOG_TAG, "GATT is null");
-            connectStatusCallback.onPeripheralDisconnected(this, new NullPointerException("GATT is null"));
+            if (connectStatusCallback != null) {
+                connectStatusCallback.onPeripheralDisconnected(this, new NullPointerException("GATT is null"));
+            }
         }
     }
 
