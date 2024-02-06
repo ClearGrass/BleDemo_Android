@@ -2,6 +2,8 @@ package com.cleargrass.lib.blue
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.Callback
@@ -36,12 +38,14 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
     private val notifyCallback: ValueCallback<UuidAndBytes>
     private val reponseCollector = ResponseCollector();
     public var debugCommandListener: DebugCommandListener?= null
+    private val hander: Handler
 
     init {
         val bytes = peripheral.advertisingBytes;
         if (bytes != null && bytes.size >= 13) {
             deviceId = peripheral.device.address.replace(":", "")
         }
+        hander = Handler(Looper.getMainLooper())
         notifyCallback = object: ValueCallback<UuidAndBytes>() {
             override fun invoke(error: String?, uuidBytes: UuidAndBytes?) {
                 uuidBytes?.let {uuidBytes ->
@@ -89,7 +93,9 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
                     callOnce = true;
                 }
             } else {
-                verify(context, randomBytes, responder)
+                hander.postDelayed({
+                    verify(context, randomBytes, responder)
+                }, 500)
             }
         }
     }
@@ -106,13 +112,23 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
                     responder.invoke(true)
                     callOnce = true;
                 }
-                writeInternalCommand(QpUtils.wrapProtocol(0x0D)) {
-                    peripheral.registerNotify(UUIDs.SERVICE, UUIDs.MY_READ, object: Callback() {
-                        override fun invoke(error: String?, value: Boolean?) {
-                            Log.e("blue", "registerNotify(0016):" + (error ?: "") + "result: $value")
-                        }
-                    }, this@QingpingDevice.notifyCallback);
-                }
+                hander.postDelayed({
+                    writeInternalCommand(QpUtils.wrapProtocol(0x0D)) {
+                        peripheral.registerNotify(
+                            UUIDs.SERVICE,
+                            UUIDs.MY_READ,
+                            object : Callback() {
+                                override fun invoke(error: String?, value: Boolean?) {
+                                    Log.e(
+                                        "blue",
+                                        "registerNotify(0016):" + (error ?: "") + "result: $value"
+                                    )
+                                }
+                            },
+                            this@QingpingDevice.notifyCallback
+                        );
+                    }
+                }, 500)
             }
         }
     }
