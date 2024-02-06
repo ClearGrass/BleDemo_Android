@@ -55,7 +55,7 @@ fun DeviceItem(device: ScanResultDevice, onClicked: () -> Unit) {
             Row {
 
                 Text(
-                    text = device.macAddress,
+                    text = "MAC: ${device.macAddress}",
                     modifier = Modifier.padding(horizontal = 8.dp),
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Start
@@ -74,6 +74,14 @@ fun DeviceItem(device: ScanResultDevice, onClicked: () -> Unit) {
                         color = Color.Red
                     )
                 }
+            }
+            if (device.macAddress.startsWith("06:66")) {
+                Text(
+                    text = "clientid: ${device.clientId}",
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    textAlign = TextAlign.Start
+                )
             }
             Text(text = device.data.rawBytes.display(), modifier = Modifier.padding(8.dp))
         }

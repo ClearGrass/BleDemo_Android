@@ -445,7 +445,6 @@ fun GreetingPreview2() {
     QpDemoBlueSparrowTheme {
         DeviceDetail(ScanResultDevice(
             "Sparrow",
-            "11:22:33:44:55:66",
             1,
             ScanResultParsed(QpUtils.hexToBytes("0x11223344AABBCCDE"))
         ))

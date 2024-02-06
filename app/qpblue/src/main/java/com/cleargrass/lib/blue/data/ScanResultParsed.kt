@@ -16,7 +16,7 @@ data class ScanResultParsed(
     constructor(rawBytes: ByteArray): this(
         frameControl = FrameControl(rawBytes[7]),
         productId = rawBytes[8],
-        rawBytes.slice(9 ..14).toByteArray().string(),
+        rawBytes.slice(9 ..14).reversed().toByteArray().display(dimter = ":", prefix = "").uppercase(),
         rawBytes = rawBytes
     )
 }

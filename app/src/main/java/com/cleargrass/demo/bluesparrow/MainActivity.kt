@@ -1,6 +1,7 @@
 package com.cleargrass.demo.bluesparrow
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -38,7 +39,6 @@ import com.cleargrass.demo.bluesparrow.ui.theme.QpDemoBlueSparrowTheme
 import com.cleargrass.lib.blue.BlueManager
 import com.cleargrass.lib.blue.DeviceScanCallback
 import com.cleargrass.lib.blue.QingpingDevice
-import com.cleargrass.lib.blue.core.QingpingFilter
 import com.cleargrass.lib.blue.data.ScanResultParsed
 
 class MainActivity : ComponentActivity() {
@@ -112,6 +112,7 @@ fun MainPage() {
     var content by remember {
         mutableStateOf("")
     }
+
     Scaffold(
         modifier = Modifier,
         floatingActionButton = {
@@ -124,9 +125,7 @@ fun MainPage() {
                     }
                     scanDevice.clear()
                     if (BlueManager.initBleManager(context)) {
-                        BlueManager.scan(QingpingFilter.build(onlyPairing, false, if (selectedPrd > 0) byteArrayOf(
-                            selectedPrd.toByte()
-                        ) else null, null), object :DeviceScanCallback() {
+                        BlueManager.scan(object :DeviceScanCallback() {
                             override fun onDeviceInRange(qingpingDevice: QingpingDevice) {
                                 Log.d("blue", "onDeviceInRange: $qingpingDevice")
                                 ScanResultDevice(qingpingDevice).let {
@@ -187,9 +186,18 @@ fun MainPage() {
                         filterText = it
                     })
             }
-            DeviceList(if (filterText.isEmpty()) scanDevice else scanDevice.filter {
-                it.name.contains(filterText, true)
-                        || it.macAddress.replace(":", "").contains(filterText.replace(":", ""), true)
+            DeviceList(if (filterText.isEmpty() && !onlyPairing && selectedPrd == 0) scanDevice else scanDevice.filter {
+                if (onlyPairing && it.isBinding == false) {
+                    return@filter false
+                }
+                if (selectedPrd > 0 && it.productId != selectedPrd.toByte()) {
+                    return@filter  false
+                }
+                if (filterText.isNotEmpty()) {
+                    return@filter it.name.contains(filterText, true)
+                            || it.macAddress.replace(":", "").contains(filterText.replace(":", ""), true)
+                }
+                return@filter  true
             }) {
                 val intent = Intent(context, DeviceActivity::class.java)
                 intent.putExtra("device", it)

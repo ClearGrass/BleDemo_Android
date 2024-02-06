@@ -22,13 +22,13 @@ public fun ByteArray.string(intRange: IntRange? = null): String {
     val byteArray = if (intRange == null) this else sliceArray(intRange)
     return String(byteArray)
 }
-public fun ByteArray.display(intRange: IntRange? = null, dimter: String = "-"):String {
+public fun ByteArray.display(intRange: IntRange? = null, dimter: String = "-", prefix: String = "0x"):String {
     val byteArray = if (intRange == null) this else sliceArray(intRange)
     var result = ""
     byteArray.forEach {
         result += it.display() + dimter
     }
-    return "0x${result.removeSuffix(dimter)}"
+    return "$prefix${result.removeSuffix(dimter)}"
 }
 public fun Byte.display(prefix: Boolean = false): String {
     return this.toUByte().toString(16).padStart(2, '0').let {

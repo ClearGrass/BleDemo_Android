@@ -20,8 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 @SuppressLint("MissingPermission")
 public class QingpingScanManager {
-
-    QingpingFilter filter;
     ScanCallback callback;
     protected BluetoothAdapter bluetoothAdapter;
     protected AtomicInteger scanSessionId = new AtomicInteger();
@@ -38,12 +36,10 @@ public class QingpingScanManager {
         if (QingpingScanManager.this.callback != null) {
             QingpingScanManager.this.callback.onScanStop();
         }
-        this.filter = null;
         this.callback = null;
     }
 
-    public void scan(QingpingFilter filter, ScanCallback callback) {
-        this.filter = filter;
+    public void scan(ScanCallback callback) {
         this.callback = callback;
         ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
         List<ScanFilter> filters = new ArrayList<>();
@@ -72,14 +68,8 @@ public class QingpingScanManager {
             if (QingpingScanManager.this.callback == null) {
                 return;
             }
-            if (QingpingScanManager.this.filter == null) {
-                return;
-            }
             ScanRecord record = result.getScanRecord();
             if (record == null) {
-                return;
-            }
-            if (!QingpingScanManager.this.filter.bytesMatched(record.getBytes())) {
                 return;
             }
 
@@ -88,7 +78,7 @@ public class QingpingScanManager {
             }
 
             Set<ParcelUuid> uuidsSet = record.getServiceData().keySet();
-            if (!uuidsSet.contains(qp_uuid) && !uuidsSet.contains(qp_uuid_legacy)) {
+            if (!uuidsSet.contains(qp_uuid)) {
                 return;
             }
             String name = result.getDevice().getName();
@@ -109,7 +99,6 @@ public class QingpingScanManager {
                 QingpingScanManager.this.callback.onScanFailed(errorCode);
             }
             QingpingScanManager.this.callback = null;
-            QingpingScanManager.this.filter = null;
         }
     };
 

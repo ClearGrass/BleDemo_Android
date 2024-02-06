@@ -17,7 +17,6 @@ import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.Callback
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
 import com.cleargrass.lib.blue.core.QingpingScanManager
-import com.cleargrass.lib.blue.core.QingpingFilter
 import com.cleargrass.lib.blue.core.ScanCallback
 
 
@@ -62,13 +61,13 @@ public object BlueManager {
         return bluetoothAdapter?.isEnabled == true
     }
     @MainThread@SuppressLint("MissingPermission")
-    fun scan(filter: QingpingFilter, scanCallback: DeviceScanCallback): Boolean {
+    fun scan(scanCallback: DeviceScanCallback): Boolean {
         if (bluetoothAdapter?.isEnabled != true) {
             scanCallback.onScanFailed(-99999);
             return false
         }
         stopScan();
-        qingpingScan?.scan(filter, object :
+        qingpingScan?.scan(object :
             ScanCallback {
             override fun onScanStart() {
                 scanCallback.onScanStart()

@@ -7,7 +7,6 @@ import com.cleargrass.lib.blue.data.ScanResultParsed
 
 data class ScanResultDevice(
     val name: String,
-    val macAddress: String,
     val rssi: Int,
     val data: ScanResultParsed
 ): Parcelable {
@@ -15,16 +14,19 @@ data class ScanResultDevice(
         get() = data.isBinding
     val productId: Byte
         get() = data.productId
+    val macAddress: String
+        get() = data.mac
+    val clientId: String
+        get() = macAddress.replace(Regex("[^0-9A-F]"), "").replace(Regex("^0+"), "")
 
     constructor(parcel: Parcel) : this(
-        parcel.readString()!!,
         parcel.readString()!!,
         parcel.readInt(),
         ScanResultParsed(parcel.createByteArray() ?: byteArrayOf())
     )
 
     constructor(qingpingDevice: QingpingDevice) : this(
-            qingpingDevice.name, qingpingDevice.address, qingpingDevice.rssi, ScanResultParsed(qingpingDevice.scanData)
+            qingpingDevice.name, qingpingDevice.rssi, ScanResultParsed(qingpingDevice.scanData)
     )
 
     override fun equals(other: Any?): Boolean {
