@@ -42,7 +42,6 @@ data class ScanResultDevice(
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(name)
-        parcel.writeString(macAddress)
         parcel.writeInt(rssi)
         parcel.writeByteArray(data.rawBytes)
     }
