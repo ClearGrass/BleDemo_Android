@@ -67,7 +67,9 @@ class QingpingDevice constructor(var peripheral: Peripheral) {
                             peripheral.registerNotify(UUIDs.SERVICE, UUIDs.COMMON_READ, object: Callback() {
                                 override fun invoke(error: String?, value: Boolean?) {
                                     if (value == true) {
-                                        statusChange.onPeripheralConnected(peripheral)
+                                        hander.postDelayed({
+                                            statusChange.onPeripheralConnected(peripheral)
+                                        }, 500)
                                     } else {
                                         peripheral.disconnect()
                                     }
