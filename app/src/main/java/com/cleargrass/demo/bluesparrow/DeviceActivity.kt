@@ -1,13 +1,7 @@
 package com.cleargrass.demo.bluesparrow
 
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothGatt
-import android.bluetooth.BluetoothManager
-import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -29,7 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,17 +53,11 @@ import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
 import com.cleargrass.lib.blue.data.*
 import com.telink.ota.ble.GattConnection
-import com.telink.ota.ble.GattConnection.ConnectionCallback
 import com.telink.ota.ble.OtaController
 import com.telink.ota.ble.OtaController.GattOtaCallback
-import com.telink.ota.foundation.OtaSetting
-import com.telink.ota.foundation.OtaStatusCode
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.Integer.max
-import java.util.UUID
 
 
 class DeviceActivity : ComponentActivity() {
