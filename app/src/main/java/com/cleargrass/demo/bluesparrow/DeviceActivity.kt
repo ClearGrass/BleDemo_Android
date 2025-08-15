@@ -242,7 +242,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                     MenuItem("更新固件", "") { _, _ ->
                         var fileName = when (device?.productType?.toInt()) {
                             0x04 -> "0x04_hodor_2_1_6.bin"
-                            0x12 -> "0x12_parrot_2_6_0.bin"
+                            0x12 -> "0x12_parrot_3_0_0.bin"
                             else -> null
                         }
                         if (fileName == null) {
@@ -252,7 +252,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                             return@MenuItem
                         }
 
-                        File(context.filesDir, fileName).let { firmwareFile ->
+                        File(context.getExternalFilesDir("files"), fileName).let { firmwareFile ->
                             if (!firmwareFile.exists()){
                                 val inputStream = context.assets.open(fileName)
                                 val outputStream = FileOutputStream(firmwareFile)
