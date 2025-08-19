@@ -242,8 +242,9 @@ fun DeviceDetail(d: ScanResultDevice) {
                     MenuItem("更新固件", "") { _, _ ->
                         var fileName = when (device?.productType?.toInt()) {
                             0x04 -> "0x04_hodor_2_1_6.bin"
+                            0x61 -> "0x61_hodor2_ti_1_0_3.bin"
                             0x12 -> "0x12_parrot_3_0_0.bin"
-                            0x59 -> "0x59_gecko_1_0_3.bin"
+                            0x59 -> "0x59_gecko_ti_1_0_3.bin"
                             else -> null
                         }
                         if (fileName == null) {
@@ -270,7 +271,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                             debugCommands += DebugCommand(
                                 "Upgrading", firmwareFile.absolutePath, byteArrayOf()
                             )
-                            if (device?.productType?.toInt() == 0x59) {
+                            if (device?.productType?.toInt() == 0x61 || device?.productType?.toInt() == 0x59) {
                                 otaHelper.execTiOTA(device.peripheral.device, firmwareFile.absolutePath, object : TiOtaCallback {
                                     override fun onOtaStatusChanged(status: UpdateState) {
                                         debugCommands += DebugCommand(
