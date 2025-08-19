@@ -24,8 +24,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 
 
-val PRD_TYPE_NAMES = listOf("不限制", "网关", "门窗传感器", "人体传感器")
-val PRD_TYPES = listOf(0, 0x0d, 0x04, 0x12)
+val PRD_TYPE_NAMES = listOf("不限制", "网关", "门窗传感器", "人体传感器", "插座-TI")
+val PRD_TYPES = listOf(0, 0x0d, 0x04, 0x12, 0x59)
 val PRD_TYPE_PAIRS = PRD_TYPES.zip(PRD_TYPE_NAMES)
 @Composable
 fun FilterBar(

@@ -52,9 +52,12 @@ import com.cleargrass.lib.blue.QpUtils
 import com.cleargrass.lib.blue.core.Peripheral
 import com.cleargrass.lib.blue.core.Peripheral.OnConnectionStatusCallback
 import com.cleargrass.lib.blue.data.*
+import com.cleargrass.lib.ti.ota.TiOtaCallback
+import com.cleargrass.lib.ti.ota.UpdateState
 import com.telink.ota.ble.GattConnection
 import com.telink.ota.ble.OtaController
 import com.telink.ota.ble.OtaController.GattOtaCallback
+import com.telink.ota.ble.OtaController.OTA_STATE_PROGRESS
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.Integer.max
@@ -78,9 +81,6 @@ class DeviceActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -243,6 +243,7 @@ fun DeviceDetail(d: ScanResultDevice) {
                         var fileName = when (device?.productType?.toInt()) {
                             0x04 -> "0x04_hodor_2_1_6.bin"
                             0x12 -> "0x12_parrot_3_0_0.bin"
+                            0x59 -> "0x59_gecko_1_0_3.bin"
                             else -> null
                         }
                         if (fileName == null) {
@@ -269,30 +270,59 @@ fun DeviceDetail(d: ScanResultDevice) {
                             debugCommands += DebugCommand(
                                 "Upgrading", firmwareFile.absolutePath, byteArrayOf()
                             )
-                            otaHelper.execOta(device!!.peripheral.device, firmwareFile.absolutePath, object: GattOtaCallback {
-                                override fun onOtaStatusChanged(
-                                    statusCode: Int,
-                                    info: String?,
-                                    connection: GattConnection?,
-                                    controller: OtaController?
-                                ) {
-                                    debugCommands += DebugCommand("OTA_Statue",
-                                        "statusCode=$statusCode info=$info", byteArrayOf())
-                                }
-
-                                override fun onOtaProgressUpdate(
-                                    progress: Int,
-                                    connection: GattConnection?,
-                                    controller: OtaController?
-                                ) {
-                                    if (debugCommands.last().action == "OTA_Progress") {
-                                        debugCommands = debugCommands.dropLast(1)
+                            if (device?.productType?.toInt() == 0x59) {
+                                otaHelper.execTiOTA(device.peripheral.device, firmwareFile.absolutePath, object : TiOtaCallback {
+                                    override fun onOtaStatusChanged(status: UpdateState) {
+                                        debugCommands += DebugCommand(
+                                            "OTA_Statue",
+                                            "statusCode=${status.toString()}", byteArrayOf()
+                                        )
                                     }
-                                    debugCommands += DebugCommand("OTA_Progress",
-                                        "$progress%", byteArrayOf())
-                                }
 
-                            })
+                                    override fun onOtaProgressUpdate(progress: Int) {
+                                        if (debugCommands.last().action == "OTA_Progress") {
+                                            debugCommands = debugCommands.dropLast(1)
+                                        }
+                                        debugCommands += DebugCommand(
+                                            "OTA_Progress",
+                                            "$progress%", byteArrayOf()
+                                        )
+                                    }
+
+                                })
+                            } else {
+                                otaHelper.execTelinkOTA(
+                                    device!!.peripheral.device,
+                                    firmwareFile.absolutePath,
+                                    object : GattOtaCallback {
+                                        override fun onOtaStatusChanged(
+                                            statusCode: Int,
+                                            info: String?,
+                                            connection: GattConnection?,
+                                            controller: OtaController?
+                                        ) {
+                                            debugCommands += DebugCommand(
+                                                "OTA_Statue",
+                                                "statusCode=$statusCode info=$info", byteArrayOf()
+                                            )
+                                        }
+
+                                        override fun onOtaProgressUpdate(
+                                            progress: Int,
+                                            connection: GattConnection?,
+                                            controller: OtaController?
+                                        ) {
+                                            if (debugCommands.last().action == "OTA_Progress") {
+                                                debugCommands = debugCommands.dropLast(1)
+                                            }
+                                            debugCommands += DebugCommand(
+                                                "OTA_Progress",
+                                                "$progress%", byteArrayOf()
+                                            )
+                                        }
+
+                                    })
+                            }
                         }
                     }
                 )

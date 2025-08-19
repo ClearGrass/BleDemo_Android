@@ -219,7 +219,6 @@ fun TextFieldValue.insert(string: String): TextFieldValue {
     )
 }
 inline fun String.insert(index: Int, text: String): String {
-    Log.d("bluesert", "$this + $text > $index")
     val builder = StringBuilder(this)
     builder.insert(index, text)
     Log.d("bluesert", builder.toString())

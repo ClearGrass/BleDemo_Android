@@ -16,3 +16,4 @@ rootProject.name = "QpDemoBlueSparrow"
 include ':app'
 include ':app:qpblue'
 include ':TelinkOtaLib'
+include ':TiOtaLib'
