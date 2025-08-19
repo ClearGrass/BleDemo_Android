@@ -21,6 +21,6 @@ object TiUuidInfo {
     // OAD Reset Characteristic UUID: F000FFD1-0451-4000-B000-000000000000
     val OAD_RESET_CHAR_UUID: UUID = UUID.fromString("F000FFD1-0451-4000-B000-000000000000")
 
-
+    // Client Characteristic Configuration Descriptor UUID (standard)
     val NOTIFICATION_DESCRIPTION: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 }
